@@ -1,10 +1,10 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
-	// import { init_context } from '$lib/api';
+	import { init_context } from '$lib/api';
 
 	let { children } = $props();
 
-	// init_context();
+	init_context();
 </script>
 
 <svelte:head>

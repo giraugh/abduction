@@ -10,5 +10,7 @@ hyper = { version = "1.6.0", features = ["server"] }
 qubit = { git = "https://github.com/andogq/qubit", branch = "main", version = "0.10.3" }
 serde = { version = "1.0.219", features = ["derive"] }
 tokio = { version = "1.47.1", features = ["full"] }
+tokio-stream = { version = "0.1.17", features = ["sync"] }
+tokio-util = { version = "0.7.16", features = ["rt"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }

@@ -1,13 +1,11 @@
 <script lang="ts">
-	import type { QubitServer } from '$lib/api.gen';
-	import { build_client, ws } from '@qubit-rs/client';
-
 	import { onMount } from 'svelte';
+	import { get_api } from '$lib/api';
+	import type { TickEvent } from '$lib/api.gen';
 
-	let events: string[] = $state([]);
+	let events: TickEvent[] = $state([]);
 	onMount(() => {
-		const transport = ws('/_/rpc');
-		const client = build_client<QubitServer>(transport);
+		const client = get_api();
 
 		client.events_stream.subscribe((event) => {
 			events = [...events, event].slice(-10);
@@ -17,6 +15,6 @@
 
 <ul>
 	{#each events as event (event)}
-		<li>{event}</li>
+		<li>{JSON.stringify(event)}</li>
 	{/each}
 </ul>
