@@ -35,7 +35,6 @@ impl EntityManager {
         });
 
         info!("Loaded {} entities", self.entities.len());
-        info!("{:?}", self.entities);
     }
 }
 
@@ -94,18 +93,31 @@ pub struct Entity {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MutationType {
-    #[serde(rename = "C")]
-    Create,
-
-    #[serde(rename = "U")]
-    Update,
+    #[serde(rename = "S")]
+    Set,
 
     #[serde(rename = "D")]
     Delete,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum EntityMutation {
-    Set(EntityId, Entity),
-    Delete(EntityId),
+pub struct EntityMutation {
+    /// Unique id for the mutation (auto inc)
+    mutation_id: i64,
+
+    /// (Later) a uuid identifying which match the mutation
+    /// applies to
+    match_id: String,
+
+    /// (Later) a uuid identifying which entity this applies to
+    entity_id: EntityId,
+
+    /// The type of mutation
+    /// either it sets the current value of an entity or it
+    /// removes one
+    mutation_type: MutationType,
+
+    /// When this is a "SET" type, this must be Some()
+    payload: Option<Entity>,
+    // TODO: timestamp type here too
 }

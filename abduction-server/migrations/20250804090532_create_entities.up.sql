@@ -16,6 +16,6 @@ CREATE TABLE entity_mutation (
     -- (Required for C and U mutations but not for D)
     payload JSONB,
 
-    -- Created at
+    -- Created at (TODO: should this be more precise?)
     timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
