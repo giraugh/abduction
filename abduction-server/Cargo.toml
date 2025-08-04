@@ -1,0 +1,14 @@
+[package]
+name = "abduction-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.8.4"
+futures = "0.3.31"
+hyper = { version = "1.6.0", features = ["server"] }
+qubit = { git = "https://github.com/andogq/qubit", branch = "main", version = "0.10.3" }
+serde = { version = "1.0.219", features = ["derive"] }
+tokio = { version = "1.47.1", features = ["full"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
