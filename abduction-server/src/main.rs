@@ -1,7 +1,10 @@
+mod entity;
+mod tick;
+
 use futures::{Stream, StreamExt};
 use qubit::{handler, Router};
-use serde::Serialize;
-use std::net::SocketAddr;
+use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool};
+use std::{env, net::SocketAddr, str::FromStr};
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use tokio::time::Duration;
@@ -10,18 +13,14 @@ use tokio_util::task::TaskTracker;
 use tracing::{debug, info, level_filters::LevelFilter};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
+use crate::{
+    entity::EntityManager,
+    tick::{perform_tick, TickEvent},
+};
+
 const TICK_DELAY: Duration = Duration::from_secs(1);
 
-pub type TickId = usize;
-
-/// Event occuring during a tick (sent to clients)
-#[derive(Debug, Clone, Serialize)]
-#[qubit::ts]
-#[serde(tag = "kind", rename_all = "snake_case")]
-enum TickEvent {
-    StartOfTick { tick_id: TickId },
-    EndOfTick { tick_id: TickId },
-}
+pub type Db = Pool<Sqlite>;
 
 /// The context type for qubit
 #[derive(Debug, Clone)]
@@ -33,12 +32,6 @@ struct QubitCtx {
 async fn events_stream(ctx: QubitCtx) -> impl Stream<Item = TickEvent> {
     let stream = tokio_stream::wrappers::BroadcastStream::new(ctx.tick_tx.subscribe());
     stream.filter_map(|e| async { e.ok() })
-}
-
-/// Perform one game tick
-/// When a match is on, this is called every second or so to update the state of the world
-async fn perform_tick(tick_tx: &broadcast::Sender<TickEvent>) {
-    // curious...
 }
 
 #[tokio::main]
@@ -61,6 +54,28 @@ async fn main() {
     router
         .generate_type("../abduction-site/src/lib/api.gen.ts")
         .expect("Failed to write bindings");
+
+    // Setup db connection
+    let db_conn_string = env::var("DATABASE_URL")
+        .expect("`DATABASE_URL` environment variable must contain a connection string");
+
+    // DB
+    let db = SqlitePool::connect_with(
+        SqliteConnectOptions::from_str(&db_conn_string)
+            .unwrap()
+            .create_if_missing(true),
+    )
+    .await
+    .unwrap();
+
+    // Run migrations
+    info!("Running db migrations");
+    sqlx::migrate!().run(&db).await.unwrap();
+
+    // Create entity manager
+    // and load current state
+    let mut entity_manager = EntityManager::new();
+    entity_manager.load_entities(&db, "TESTING").await;
 
     // Create channel for tick events
     let (tick_tx, mut tick_rx) = broadcast::channel::<TickEvent>(10);
@@ -91,7 +106,7 @@ async fn main() {
                     .expect("Cannot send start of tick event");
 
                 // Run the next tick
-                perform_tick(&tick_tx).await;
+                perform_tick(&tick_tx, &mut entity_manager, &db).await;
 
                 // Tell em we finished the tick
                 tick_tx
