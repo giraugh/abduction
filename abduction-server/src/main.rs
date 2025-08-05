@@ -1,5 +1,5 @@
 mod entity;
-mod tick;
+mod mtch;
 
 use futures::{Stream, StreamExt};
 use qubit::{handler, Router};
@@ -15,7 +15,7 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 use crate::{
     entity::EntityManager,
-    tick::{perform_tick, TickEvent},
+    mtch::{perform_match_tick, MatchConfig, MatchId, TickEvent},
 };
 
 const TICK_DELAY: Duration = Duration::from_secs(1);
@@ -74,8 +74,21 @@ async fn main() {
 
     // Create entity manager
     // and load current state
+    let test_match_id: MatchId = 1;
     let mut entity_manager = EntityManager::new();
-    entity_manager.load_entities(&db, "TESTING").await;
+    entity_manager.load_entities(&db, test_match_id).await;
+
+    // During development here's the plan:
+    //  - Whenever you start the development server, create a new match
+    //  - It will be a successor of the last match that occured
+    //  - Start simulating that match
+
+    // TODO: we need to store in-memory state about what the currently simulating match is
+    //       do we need a matchmanager for this?
+
+    // Load test match config
+    let match_config = MatchConfig::get(&db, test_match_id).await.unwrap();
+    dbg!(match_config);
 
     // Create channel for tick events
     let (tick_tx, mut tick_rx) = broadcast::channel::<TickEvent>(10);
@@ -106,7 +119,7 @@ async fn main() {
                     .expect("Cannot send start of tick event");
 
                 // Run the next tick
-                perform_tick(&tick_tx, &mut entity_manager, &db).await;
+                perform_match_tick(&tick_tx, &mut entity_manager, &db).await;
 
                 // Tell em we finished the tick
                 tick_tx

@@ -5,8 +5,8 @@ CREATE TABLE entity_mutation (
     -- A uuid field identifying the entity
     entity_id TEXT NOT NULL,
 
-    -- A uuid field identifying which match its in
-    match_id TEXT NOT NULL,
+    -- An identifying which match its for
+    match_id INTEGER NOT NULL,
 
     -- Mutation type
     -- Either (S)et or (D)elete
@@ -16,6 +16,8 @@ CREATE TABLE entity_mutation (
     -- (Required for C and U mutations but not for D)
     payload JSONB,
 
-    -- Created at (TODO: should this be more precise?)
+    -- Created at
     timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- TODO FOREIGN KEY ON MATCH CONFIG

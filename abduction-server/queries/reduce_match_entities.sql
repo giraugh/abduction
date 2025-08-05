@@ -12,7 +12,7 @@ latest_mutations AS (
 )
 SELECT
     entity_id,
-    payload as "entity: Json<Entity>"
+    payload as "entity: Json<EntityPayload>"
 FROM
     latest_mutations
 WHERE
