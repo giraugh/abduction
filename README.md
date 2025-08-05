@@ -1,26 +1,4 @@
 # Abduction
 
-
-## Brainstorming
-
-Entity markers
-- IsPlayer
-- IsFood
-- IsMonster
-- IsScary
-- IsViewable
-
-Entity attributes
-- Hunger(x)
-- Health(x)
-- Strength(x)
-- Speed(x)
-- Constitution(x)
-- Willpower(x)
-- Charisma(x)
-
-Entity relations (can have multiples)
-- Bond(e, kind)
-  - Where kind is `friend | sibling | parent | child`
-- CreatedBy(e)
-- HeldBy(e)
+Plan is that the server simulates a simple mostly text-based survival game and streams it to the site. The sites show whats happening
+on a hex grid w/ event logs from each hex.
