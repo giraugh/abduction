@@ -28,7 +28,7 @@ impl EntityManager {
             ents.clear();
             ents
         } else {
-            self.match_entities.insert(match_id, HashMap::new());
+            self.match_entities.insert(match_id.clone(), HashMap::new());
             self.match_entities.get_mut(&match_id).unwrap()
         };
 
@@ -179,4 +179,16 @@ pub struct EntityMutation {
 
     /// When this is a "SET" type, this must be Some()
     payload: Option<EntityPayload>,
+}
+
+#[macro_export]
+macro_rules! has_markers {
+    ($e: expr, $marker: expr) => {{
+        use EntityMarker::*;
+        ($e).markers.contains(&$marker)
+    }};
+    ($e: expr, $marker: expr, $($markers: expr),+) => {{
+        use EntityMarker::*;
+        ($e).markers.contains(&$marker) && (has_markers!($e, $($markers),+))
+    }};
 }

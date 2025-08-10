@@ -15,7 +15,7 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 use crate::{
     entity::EntityManager,
-    mtch::{perform_match_tick, MatchConfig, MatchId, TickEvent},
+    mtch::{MatchConfig, MatchManager, TickEvent},
 };
 
 const TICK_DELAY: Duration = Duration::from_secs(1);
@@ -74,21 +74,23 @@ async fn main() {
 
     // Create entity manager
     // and load current state
-    let test_match_id: MatchId = 1;
     let mut entity_manager = EntityManager::new();
-    entity_manager.load_entities(&db, test_match_id).await;
+    let mut match_manager = MatchManager::new();
 
-    // During development here's the plan:
-    //  - Whenever you start the development server, create a new match
-    //  - It will be a successor of the last match that occured
-    //  - Start simulating that match
+    // Create new match
+    // #NOTE: #HACK: during dev, we just create a new isolated match each time
+    //               we restart
+    let test_match = MatchConfig::isolated(100);
+    test_match
+        .save(&db)
+        .await
+        .expect("Failed to save new match config");
 
-    // TODO: we need to store in-memory state about what the currently simulating match is
-    //       do we need a matchmanager for this?
-
-    // Load test match config
-    let match_config = MatchConfig::get(&db, test_match_id).await.unwrap();
-    dbg!(match_config);
+    // And prepare it to run
+    match_manager
+        .initialise_new_match(test_match, &mut entity_manager, &db)
+        .await
+        .expect("Failed to initialise match");
 
     // Create channel for tick events
     let (tick_tx, mut tick_rx) = broadcast::channel::<TickEvent>(10);
@@ -119,7 +121,9 @@ async fn main() {
                     .expect("Cannot send start of tick event");
 
                 // Run the next tick
-                perform_match_tick(&tick_tx, &mut entity_manager, &db).await;
+                match_manager
+                    .perform_match_tick(&tick_tx, &mut entity_manager, &db)
+                    .await;
 
                 // Tell em we finished the tick
                 tick_tx
