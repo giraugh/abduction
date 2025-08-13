@@ -1,5 +1,6 @@
 mod entity;
 mod mtch;
+mod player_gen;
 
 use futures::{Stream, StreamExt};
 use qubit::{handler, Router};
