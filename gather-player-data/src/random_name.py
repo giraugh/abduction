@@ -2,7 +2,7 @@ import os
 import sys
 import random
 
-def main(file_path):
+def get_random_name(file_path):
     # Choose a random start byte
     file_size = os.path.getsize(file_path)
     start_off = random.randrange(0, file_size, 1)
@@ -29,7 +29,10 @@ def main(file_path):
                 bytes.append(c)
         bytes_ = bytearray(b''.join(bytes))
         decoded = bytes_.decode('utf-8')
-        print(decoded)
+    return decoded
+
+def main(file_path):
+    print(get_random_name(file_path))
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

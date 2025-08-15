@@ -5,7 +5,11 @@ import write_first_names
 
 OUTPUT_PATH = write_first_names.OUTPUT_DIR + '/family_names.txt'
 
+# Is this a char we are using? Just needs to be searhable via ASCII
+# and I also get rid of spaces to avoid confusion here
 def can_normalise_to_ascii(ch):
+    if ch.isspace():
+        return False
     if ord(ch) < 128:
         return True
     decomposed = unicodedata.normalize('NFD', ch)
