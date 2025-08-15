@@ -2,39 +2,36 @@ import os
 import sys
 import random
 
-import write_names
+def main(file_path):
+    # Choose a random start byte
+    file_size = os.path.getsize(file_path)
+    start_off = random.randrange(0, file_size, 1)
 
-def main(age_class):
-    # valid age class?
-    if age_class not in write_names.AGE_CLASSES.keys():
-        raise ValueError(f'Invalid age class "{age_class}"')
+    # Load the file at that index and seek backwards till we hit a newline
+    with open(file_path, 'rb') as f:
+        # Go back to previous NL
+        if start_off != 0:
+            pos = start_off - 1
+            while pos >= 0:
+                f.seek(pos)
+                byte = f.read(1)
+                if byte == b'\n':
+                    break
+                pos -= 1
 
-    idx_path = f'{write_names.OUTPUT_DIR}/{age_class}.idx'
-    names_path = f'{write_names.OUTPUT_DIR}/{age_class}.txt'
-
-    # Choose a random pair of bytes from within the index
-    name_count = os.path.getsize(idx_path) // 2 # stored as 2 bytes so we half
-    name_index = random.randrange(0, name_count - 1, 1)
-
-    # Load the index file and determine the byte offset
-    # for the chosen name
-    with open(idx_path, 'rb') as f:
-        f.seek(name_index * 2)
-        offset_b = f.read(2)
-        offset = int.from_bytes(offset_b, 'big')
-
-    # Now go read from that offset till we hit a newline
-    with open(names_path, 'r') as f:
-        name = ""
-        f.seek(offset)
+        # Now read until a NL
+        bytes = []
         while True:
             c = f.read(1)
-            if c == '\n' or c == '':
+            if c == '' or c == b'\n':
                 break
-            name += c
-    print(name)
+            elif c:
+                bytes.append(c)
+        bytes_ = bytearray(b''.join(bytes))
+        decoded = bytes_.decode('utf-8')
+        print(decoded)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        raise ValueError('Expected age class argument')
+        raise ValueError('Expected path argument')
     main(sys.argv[1])

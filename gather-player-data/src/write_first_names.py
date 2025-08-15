@@ -1,7 +1,5 @@
 import glob
 import os
-import struct
-import math
 import pandas as pd
 from git import Repo  # pip install gitpython
 
@@ -82,39 +80,13 @@ def main():
     for ac in age_dfs.keys():
         print(ac, len(age_dfs[ac]))
 
-    # For the best performance n stuff, we're gonna do this a slightly wacky way
-    # rather than use like csv or something - instead we're gonna do this:
-    #  - store each name on a new line of a .txt file
-    #  - generate an index with the byte offset of each line as a 16-bit uint.
-    #  - This way, we can seek to a random index, read it, then go to that
-    #    byte in the name file and read until a newline.
+    # Write the names w/ new line seps
     print('Writing name files')
     for ac in age_dfs.keys():
-        # Concatenate the names seperated by newlines
-        # and keep track of the byte offset for each
-        offset = 0
-        names = ''
-        indexes = []
-        for name in age_dfs[ac]['name']:
-            # Record offset
-            assert offset < math.pow(2, 16)
-            indexes.append(struct.pack('>H', offset))
-
-            # Add name and increment offset
-            names += f'{name}\n'
-            offset += len(name) + 1
-
-        # Write the names text file
         with open(f'{OUTPUT_DIR}/{ac}.txt', 'w') as f:
             f.truncate(0)
-            f.write(names)
-
-        # Write the index
-        with open(f'{OUTPUT_DIR}/{ac}.idx', 'wb') as f:
-            f.truncate(0)
-            for index in indexes:
-                f.write(index)
-
+            for name in age_dfs[ac]['name']:
+                f.write(name + '\n')
 
 
 if __name__ == "__main__":

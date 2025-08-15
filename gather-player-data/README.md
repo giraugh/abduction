@@ -6,14 +6,16 @@ In particular, it splits the names into three age classes:
  - `mature`
  - `old`
 
-And it writes the names in a sort of popularity-order to a text file seperated by newlines. It also outputs an index file (the adjacent .idx) file with byte offsets for each name stored as 16-bit uints. This way you can choose a random byte pair in the index, lookup that offset and then read until a newline in order to get a random name without reading either file into memory.
+And it writes the names in a sort of popularity-order to a text file seperated by newlines.
 
-I also included a `random_name.py` script to test and demonstrate how to get a random name using the idx files.
+I also included a `random_name.py` script to test and demonstrate how to get a random name without loading the whole file.
 
 ## Usage
 
 (*requires `uv`*)
 
-- **Write the names** - `uv run src/write_names.py`
+- **Write the first names** - `uv run src/write_first_names.py`
  - (Will clone the name repo if not already present)
+- **Write the family names** - `uv run src/write_family_names.py`
+ - (Pulls down a lot of data)
 - **Get a random name as a test** - `uv run src/random_name.py`
