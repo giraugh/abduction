@@ -1,4 +1,4 @@
-use anyhow::{bail, Context};
+use anyhow::Context;
 /// Matches module (called `mtch` for rust reasons)
 ///
 /// The #plan for matches and match sequencing
@@ -22,8 +22,10 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    entity::{EntityManager, EntityMarker},
-    has_markers, Db,
+    entity::{EntityManager, EntityManagerMutation, EntityMarker},
+    has_markers,
+    player_gen::generate_player,
+    Db,
 };
 
 /// Id for a given match
@@ -103,11 +105,15 @@ impl MatchManager {
                 })
         }
 
-        // TODO: If we dont have enough players for the match configuration,
-        //       then generate and add more
+        // If we dont have enough players for the match configuration,
+        // then generate and add more
         let player_count_to_gen = match_config.player_count - existing_players;
-        let generated_players = (0..player_count_to_gen).map(|_| todo!());
+        for _ in 0..player_count_to_gen {
+            let player_entity = generate_player()?;
+            entity_manager.upsert_entity(&match_config.match_id, player_entity)?;
+        }
 
+        // Put players in the desired locations
         // TODO
 
         Ok(())
@@ -125,19 +131,34 @@ impl MatchManager {
             panic!("Cannot run match tick without current match");
         };
 
-        // curious...
-        // TODO
+        // TODO: implement actual actions, agents, world changes etc
+
+        // Flush changes to entities to the DB and to clients
+        entity_manager.flush_changes(tick_tx, &db).await.unwrap();
     }
 }
 
 /// Event occuring during a tick
 /// Is sent to clients so they can display the game in real-time
+///
+/// TIMING:
+///
+///  - StartOfTick
+///  - (Processing happens on server)
+///  - EntityChanges
+///  - EndOfTick
 #[derive(Debug, Clone, Serialize)]
 #[qubit::ts]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TickEvent {
+    /// A new tick has started
     StartOfTick { tick_id: TickId },
+
+    /// A new tick has ended
     EndOfTick { tick_id: TickId },
+
+    /// Set of changes to entities during the last tick
+    EntityChanges { changes: Vec<EntityManagerMutation> },
 }
 
 /// The configuration for a given match

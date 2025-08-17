@@ -3,12 +3,77 @@ use std::fs::{self, File};
 use std::io::{BufReader, Read, Seek};
 use std::str::FromStr;
 use std::{io::SeekFrom, os::unix::fs::MetadataExt, path::PathBuf};
+use uuid::Uuid;
+
+use crate::entity::{Entity, EntityAttributes, EntityMarker};
 
 const NAMES_DIR: &str = "../gather-player-data/output";
 const FAMILY_NAMES_PATH: &str = "../gather-player-data/output/family_names.txt";
 
 // Player gen constants
-const PLAYER_AGE_RANGE: std::ops::Range<usize> = (18..100);
+const PLAYER_AGE_RANGE: std::ops::Range<usize> = 18..100;
+
+/// Generate a player entity
+/// (Returns but does not save to DB)
+pub fn generate_player() -> anyhow::Result<Entity> {
+    // Generate an age / class
+    let mut rng = rand::rng();
+    let age = rng.random_range(PLAYER_AGE_RANGE);
+    let age_class = AgeClass::from(age);
+
+    // Generate an age appropriate name
+    // TODO: could add other things like infix letters "* P. * " or suffix titles "Jr" "Sr" etc
+    let first_name = age_class.get_random_first_name()?;
+    let family_name = random_line_from_text_file(FAMILY_NAMES_PATH.into())?;
+    let player_name = format!("{first_name} {family_name}");
+
+    // FUTURE: {
+    //    TODO: player bond generation
+    //    TODO: take all bonds, filter down by compatability with age etc
+    // }
+
+    // Initialise empty set of markers and relations
+    let mut markers: Vec<EntityMarker> = Vec::new();
+    let mut relations: Vec<_> = Vec::new();
+
+    // Add the player marker
+    markers.push(EntityMarker::Player);
+    markers.push(EntityMarker::Viewable);
+
+    // Generate some random player attributes
+    // (primarily motivators but a few others)
+    let mut attributes = EntityAttributes::random_motivators();
+
+    // Update the age to what we generated earlier
+    attributes.age = Some(age);
+
+    // We store the players "family" seperately to their name in case it changes
+    // also lets us look up players by family
+    // NOTE: all entities have a name, not just players so this is duplicated
+    //       it wont update the entity name if these are changed... its all g
+    attributes.first_name = Some(first_name);
+    attributes.family_name = Some(family_name);
+
+    // Encode the players location
+    // which we default to the world origin
+    attributes.hex = Some((0, 0));
+
+    // So we can show them on the screen, assign them a colour
+    // fairly arbitrary right now I think...
+    // but we could align this with alliances etc later
+    attributes.display_color_hue = Some(rng.random_range(0.0..360.0));
+
+    // Create the entity
+    let player_entity = Entity {
+        entity_id: Uuid::now_v7().hyphenated().to_string(),
+        name: player_name,
+        markers,
+        relations,
+        attributes,
+    };
+
+    Ok(player_entity)
+}
 
 /// Get a random name from a text file, without loading
 /// the whole file ideally
@@ -77,23 +142,6 @@ impl From<usize> for AgeClass {
             _ => Self::Old,
         }
     }
-}
-
-/// Generate a player entity
-pub fn generate_player() -> anyhow::Result<()> {
-    // Generate an age / class
-    let mut rng = rand::rng();
-    let age = rng.random_range(PLAYER_AGE_RANGE);
-    let age_class = AgeClass::from(age);
-
-    // Generate an age appropriate name
-    let first_name = age_class.get_random_first_name()?;
-    let family_name = random_line_from_text_file(FAMILY_NAMES_PATH.into())?;
-    let player_name = format!("{first_name} {family_name}");
-
-    // TODO..
-
-    Ok(())
 }
 
 #[cfg(test)]
