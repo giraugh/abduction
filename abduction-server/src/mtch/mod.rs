@@ -1,4 +1,6 @@
-use anyhow::Context;
+pub mod config;
+pub use config::*;
+
 /// Matches module (called `mtch` for rust reasons)
 ///
 /// The #plan for matches and match sequencing
@@ -14,13 +16,10 @@ use anyhow::Context;
 /// - The match will then be scheduled but not run until the Monday.
 /// - Add queries and UI such that players can see the next upcoming match.
 ///
-use chrono::{Local, NaiveDateTime};
 use rand::Rng;
-use serde::{Deserialize, Serialize};
-use sqlx::prelude::FromRow;
+use serde::Serialize;
 use tokio::sync::broadcast;
 use tracing::info;
-use uuid::Uuid;
 
 use crate::{
     entity::{EntityManager, EntityManagerMutation, EntityMarker},
@@ -99,19 +98,25 @@ impl MatchManager {
         // TODO: implement actual actions, agents, world changes etc
 
         // TEMP: for now just choose a random entity, and move it to the right
-        let ent_id = {
-            let all_ents: Vec<_> = self.match_entities.get_all_entities().collect();
-            let ent_i = rand::rng().random_range(0..all_ents.len());
-            all_ents[ent_i].entity_id.clone()
-        };
+        {
+            let random_entity_id = {
+                let all_ids: Vec<_> = self
+                    .match_entities
+                    .get_all_entities()
+                    .map(|e| &e.entity_id)
+                    .collect();
+                let index = rand::rng().random_range(0..all_ids.len());
+                all_ids[index].clone()
+            };
 
-        self.match_entities
-            .mutate(&ent_id, |e| {
-                if let Some(h) = e.attributes.hex.as_mut() {
-                    h.0 += 1;
-                }
-            })
-            .unwrap();
+            self.match_entities
+                .mutate(&random_entity_id, |e| {
+                    if let Some(h) = e.attributes.hex.as_mut() {
+                        h.0 += 1;
+                    }
+                })
+                .unwrap();
+        }
 
         // Flush changes to entities to the DB and to clients
         self.match_entities
@@ -142,64 +147,4 @@ pub enum TickEvent {
 
     /// Set of changes to entities during the last tick
     EntityChanges { changes: Vec<EntityManagerMutation> },
-}
-
-/// The configuration for a given match
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct MatchConfig {
-    /// Unique v7 uuid for this match
-    match_id: MatchId,
-
-    /// The number of players in the match
-    ///  - Players will be copied across from predecessor match if appropriate,
-    ///  - otherwise new players will be generated when the match is setup
-    player_count: i64,
-
-    /// Optionally, the id of the match preceding
-    /// this one. If set, players and some entities may be copied across
-    /// #[sqlx(try_from = "Option<String>")]
-    preceding_match_id: Option<MatchId>,
-
-    /// When the configuration was created
-    created_at: NaiveDateTime,
-}
-
-impl MatchConfig {
-    fn new(player_count: usize, preceding_player_id: Option<MatchId>) -> Self {
-        Self {
-            match_id: Uuid::now_v7().hyphenated().to_string(),
-            player_count: player_count as i64,
-            preceding_match_id: preceding_player_id,
-            created_at: Local::now().naive_utc(),
-        }
-    }
-
-    pub fn isolated(player_count: usize) -> Self {
-        Self::new(player_count, None)
-    }
-
-    /// Get one match config from the db
-    #[allow(unused)]
-    pub async fn get(db: &Db, match_id: MatchId) -> anyhow::Result<Self> {
-        sqlx::query_file_as!(Self, "queries/get_match_config.sql", match_id)
-            .fetch_one(db)
-            .await
-            .context("getting match config")
-    }
-
-    pub async fn save(&self, db: &Db) -> anyhow::Result<()> {
-        info!("Saving match configuration {} to db", &self.match_id);
-        sqlx::query_file_as!(
-            Self,
-            "queries/set_match_config.sql",
-            self.match_id,
-            self.player_count,
-            self.preceding_match_id,
-            self.created_at
-        )
-        .execute(db)
-        .await
-        .map(|_| ())
-        .context("Saving match config")
-    }
 }

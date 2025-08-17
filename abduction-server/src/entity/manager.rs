@@ -207,6 +207,7 @@ impl EntityManager {
 
         // Otherwise, drain them all
         let pending_mutations: Vec<_> = self.pending_mutations.drain(0..).collect();
+        let mutation_count = pending_mutations.len();
 
         // TODO: de-dupe mutations affecting the same entity
         //   - If the last op was a `D` -> dont send the initial sets, its just deleted
@@ -234,6 +235,7 @@ impl EntityManager {
             .context("Failed to persist entity mutation to DB")?;
         }
 
+        info!("Flushed {mutation_count} pending mutation(s)");
         Ok(())
     }
 }
