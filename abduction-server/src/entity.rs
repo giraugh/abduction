@@ -1,6 +1,5 @@
 use std::{collections::HashMap, ops::Deref};
 
-use anyhow::Context;
 use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
 use sqlx::{query_file_as, types::Json};
@@ -46,19 +45,19 @@ pub struct EntityMutation {
 
 impl EntityMutation {
     pub fn from_entity_manager_mutation(
-        match_id: MatchId,
+        match_id: &MatchId,
         mutation: EntityManagerMutation,
     ) -> Self {
         match mutation {
             EntityManagerMutation::SetEntity(entity) => Self {
                 entity_id: entity.entity_id.clone(),
-                match_id,
+                match_id: match_id.clone(),
                 mutation_type: EntityMutationType::Set,
                 payload: Some(entity.into()),
             },
             EntityManagerMutation::RemoveEntity(entity_id) => Self {
                 entity_id,
-                match_id,
+                match_id: match_id.clone(),
                 mutation_type: EntityMutationType::Delete,
                 payload: None,
             },
@@ -66,42 +65,42 @@ impl EntityMutation {
     }
 }
 
-/// Loads entities and manages updating them
+/// Loads entities and manages updating them FOR A GIVEN MATCH
 ///
 /// # UPDATING ENTITIES
 /// In particular, when an entity is mutated somehow,
 /// it is immediately updated in this structs state and we store
 /// a mutation to be sent to clients/the db at the end of the tick
 pub struct EntityManager {
-    /// Map from matchId -> Map<>
-    match_entities: HashMap<MatchId, HashMap<EntityId, Entity>>,
+    /// The match id
+    match_id: MatchId,
+
+    /// Map from entity id to entity
+    /// (Note that entity object also has an id)
+    entities: HashMap<EntityId, Entity>,
 
     /// Waiting mutations for flush
     pending_mutations: Vec<EntityManagerMutation>,
 }
 
 impl EntityManager {
-    pub fn new() -> Self {
+    pub fn new(match_id: &MatchId) -> Self {
         Self {
-            match_entities: HashMap::default(),
+            match_id: match_id.clone(),
+            entities: HashMap::default(),
             pending_mutations: Default::default(),
         }
     }
 
-    pub fn get_entities(&self, match_id: MatchId) -> Option<impl Iterator<Item = &Entity>> {
-        self.match_entities.get(&match_id).map(|e| e.values())
+    pub fn get_all_entities(&self) -> impl Iterator<Item = &Entity> {
+        self.entities.values()
     }
 
-    pub async fn load_entities(&mut self, db: &Db, match_id: MatchId) {
-        // Either clear or create entities map for the match
-        let entity_map = if let Some(ents) = self.match_entities.get_mut(&match_id) {
-            ents.clear();
-            ents
-        } else {
-            self.match_entities.insert(match_id.clone(), HashMap::new());
-            self.match_entities.get_mut(&match_id).unwrap()
-        };
-
+    /// Static method which gets entities but does not save them against a manager
+    pub async fn load_entities_from_match(
+        match_id: &MatchId,
+        db: &Db,
+    ) -> impl Iterator<Item = Entity> {
         query_file_as!(
             AggregatedEntities,
             "queries/reduce_match_entities.sql",
@@ -111,25 +110,39 @@ impl EntityManager {
         .await
         .unwrap()
         .into_iter()
+        .map(|AggregatedEntities { entity_id, entity }| {
+            entity.unwrap().deref().clone().convert_to_entity(entity_id)
+        })
+    }
+
+    /// Load the entities in from a given match
+    pub async fn load_entities(&mut self, db: &Db) {
+        let mut loaded = 0;
+        query_file_as!(
+            AggregatedEntities,
+            "queries/reduce_match_entities.sql",
+            self.match_id,
+        )
+        .fetch_all(db)
+        .await
+        .unwrap()
+        .into_iter()
         .for_each(|AggregatedEntities { entity_id, entity }| {
-            entity_map.insert(
+            loaded += 1;
+            self.entities.insert(
                 entity_id.clone(),
                 entity.unwrap().deref().clone().convert_to_entity(entity_id),
             );
         });
 
-        info!("Loaded {} entities", entity_map.len());
+        info!("Loaded {} entities", loaded);
     }
 
     /// Update or create a new entity
-    pub fn upsert_entity(&mut self, match_id: &MatchId, entity: Entity) -> anyhow::Result<()> {
-        let ents = self
-            .match_entities
-            .get_mut(match_id)
-            .context("Getting entities for given match id")?;
-
+    pub fn upsert_entity(&mut self, entity: Entity) -> anyhow::Result<()> {
         // Upsert that an entity
-        ents.insert(entity.entity_id.clone(), entity.clone());
+        self.entities
+            .insert(entity.entity_id.clone(), entity.clone());
 
         // Store a mutation for later
         self.pending_mutations
@@ -138,18 +151,9 @@ impl EntityManager {
         Ok(())
     }
 
-    pub fn remove_entity(
-        &mut self,
-        match_id: &MatchId,
-        entity_id: &EntityId,
-    ) -> anyhow::Result<()> {
-        let ents = self
-            .match_entities
-            .get_mut(match_id)
-            .context("Getting entities for given match id")?;
-
+    pub fn remove_entity(&mut self, entity_id: &EntityId) -> anyhow::Result<()> {
         // Remove that an entity
-        ents.remove(entity_id);
+        self.entities.remove(entity_id);
 
         // Store a mutation for later
         self.pending_mutations
@@ -178,8 +182,8 @@ impl EntityManager {
 
         // Add changes to DB
         for mutation in pending_mutations {
+            let mutation = EntityMutation::from_entity_manager_mutation(&self.match_id, mutation);
             todo!()
-            // let mutation = EntityMutation::from_entity_manager_mutation(match_id, mutation);
             // sqlx::query_file!("queries/add_match_mutations.sql")
             //     .fetch(db)
             //     .await;

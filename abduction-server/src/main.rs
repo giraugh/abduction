@@ -14,10 +14,7 @@ use tokio_util::task::TaskTracker;
 use tracing::{debug, info, level_filters::LevelFilter};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-use crate::{
-    entity::EntityManager,
-    mtch::{MatchConfig, MatchManager, TickEvent},
-};
+use crate::mtch::{MatchConfig, MatchManager, TickEvent};
 
 const TICK_DELAY: Duration = Duration::from_secs(1);
 
@@ -73,12 +70,7 @@ async fn main() {
     info!("Running db migrations");
     sqlx::migrate!().run(&db).await.unwrap();
 
-    // Create entity manager
-    // and load current state
-    let mut entity_manager = EntityManager::new();
-    let mut match_manager = MatchManager::new();
-
-    // Create new match
+    // Prepare config for new match
     // #NOTE: #HACK: during dev, we just create a new isolated match each time
     //               we restart
     let test_match = MatchConfig::isolated(100);
@@ -87,9 +79,11 @@ async fn main() {
         .await
         .expect("Failed to save new match config");
 
-    // And prepare it to run
+    // Create match manager
+    // and prepare it to run
+    let mut match_manager = MatchManager::load_match(test_match, &db);
     match_manager
-        .initialise_new_match(test_match, &mut entity_manager, &db)
+        .initialise_new_match(&db)
         .await
         .expect("Failed to initialise match");
 
@@ -122,9 +116,7 @@ async fn main() {
                     .expect("Cannot send start of tick event");
 
                 // Run the next tick
-                match_manager
-                    .perform_match_tick(&tick_tx, &mut entity_manager, &db)
-                    .await;
+                match_manager.perform_match_tick(&tick_tx, &db).await;
 
                 // Tell em we finished the tick
                 tick_tx

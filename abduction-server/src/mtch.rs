@@ -38,66 +38,39 @@ pub type MatchId = String;
 pub type TickId = usize;
 
 pub struct MatchManager {
-    /// There may not always be a match on, but there will always be a match manager
-    /// thus this is optional
-    current_match: Option<MatchConfig>,
+    match_config: MatchConfig,
+    match_entities: EntityManager,
 }
 
 impl MatchManager {
-    pub fn new() -> Self {
+    pub fn load_match(match_config: MatchConfig, db: &Db) -> Self {
+        // Create an entity manager and load the entities for the match
+        let mut match_entities = EntityManager::new(&match_config.match_id);
+        match_entities.load_entities(db);
+
         Self {
-            current_match: None,
+            match_config,
+            match_entities,
         }
     }
 
-    /// Update currently loaded match,
-    /// load all the entities from it,
-    /// etc
-    ///
-    /// NOTE: use this when resuming a match
-    pub async fn load_match(
-        &mut self,
-        match_config: MatchConfig,
-        entity_manager: &mut EntityManager,
-        db: &Db,
-    ) {
-        // Update state for current match
-        self.current_match = Some(match_config.clone());
-
-        // And load them now
-        entity_manager
-            .load_entities(db, match_config.match_id)
-            .await;
-    }
-
     /// Load in a match configuration, generating any resources needed for the game
-    /// Updates "current match" to this new match config.
     ///
     /// This should only be done once per match, realistically - so prob do it when
     /// the config is created
     ///
     /// NOTE: This can be done before the match is ready to be run
     ///       i.e right after the previous match if appropriate.
-    pub async fn initialise_new_match(
-        &mut self,
-        match_config: MatchConfig,
-        entity_manager: &mut EntityManager,
-        db: &Db,
-    ) -> anyhow::Result<()> {
-        // First load that match
-        self.load_match(match_config.clone(), entity_manager, db)
-            .await;
-
+    pub async fn initialise_new_match(&mut self, db: &Db) -> anyhow::Result<()> {
         // Now we initialise it...
-        info!("Initialising match {}", &match_config.match_id);
+        info!("Initialising match {}", &self.match_config.match_id);
 
         // Add all the unescaped players from the last game
         // In practice, this just means cloning the entity into the new match
         let mut existing_players = 0;
-        if let Some(preceding_match_id) = &match_config.preceding_match_id {
-            entity_manager
-                .get_entities(preceding_match_id.clone())
-                .expect("No such preceding match {preceding_match_id}")
+        if let Some(preceding_match_id) = &self.match_config.preceding_match_id {
+            EntityManager::load_entities_from_match(preceding_match_id, db)
+                .await
                 .filter(|e| has_markers!(e, Player) && !has_markers!(e, Escaped))
                 .for_each(|entity| {
                     existing_players += 1;
@@ -107,10 +80,10 @@ impl MatchManager {
 
         // If we dont have enough players for the match configuration,
         // then generate and add more
-        let player_count_to_gen = match_config.player_count - existing_players;
+        let player_count_to_gen = self.match_config.player_count - existing_players;
         for _ in 0..player_count_to_gen {
             let player_entity = generate_player()?;
-            entity_manager.upsert_entity(&match_config.match_id, player_entity)?;
+            self.match_entities.upsert_entity(player_entity)?;
         }
 
         // Put players in the desired locations
@@ -121,20 +94,14 @@ impl MatchManager {
 
     /// Perform one game tick
     /// When a match is on, this is called every second or so to update the state of the world
-    pub async fn perform_match_tick(
-        &mut self,
-        tick_tx: &broadcast::Sender<TickEvent>,
-        entity_manager: &mut EntityManager,
-        db: &Db,
-    ) {
-        let Some(match_config) = &self.current_match else {
-            panic!("Cannot run match tick without current match");
-        };
-
+    pub async fn perform_match_tick(&mut self, tick_tx: &broadcast::Sender<TickEvent>, db: &Db) {
         // TODO: implement actual actions, agents, world changes etc
 
         // Flush changes to entities to the DB and to clients
-        entity_manager.flush_changes(tick_tx, &db).await.unwrap();
+        self.match_entities
+            .flush_changes(tick_tx, db)
+            .await
+            .unwrap();
     }
 }
 
