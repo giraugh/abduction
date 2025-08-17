@@ -13,7 +13,7 @@ CREATE TABLE entity_mutation (
     mutation_type TEXT CHECK( mutation_type IN ('S','D') ) NOT NULL,
 
     -- payload for mutation
-    -- (Required for C and U mutations but not for D)
+    -- (Required for S mutations but not for D)
     payload JSONB,
 
     -- Created at

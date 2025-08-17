@@ -73,15 +73,16 @@ async fn main() {
     // Prepare config for new match
     // #NOTE: #HACK: during dev, we just create a new isolated match each time
     //               we restart
-    let test_match = MatchConfig::isolated(100);
-    test_match
+    info!("Creating new match config for development");
+    let dev_match = MatchConfig::isolated(100);
+    dev_match
         .save(&db)
         .await
         .expect("Failed to save new match config");
 
     // Create match manager
     // and prepare it to run
-    let mut match_manager = MatchManager::load_match(test_match, &db);
+    let mut match_manager = MatchManager::load_match(dev_match, &db).await;
     match_manager
         .initialise_new_match(&db)
         .await

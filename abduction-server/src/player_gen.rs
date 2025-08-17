@@ -34,7 +34,7 @@ pub fn generate_player() -> anyhow::Result<Entity> {
 
     // Initialise empty set of markers and relations
     let mut markers: Vec<EntityMarker> = Vec::new();
-    let mut relations: Vec<_> = Vec::new();
+    let relations: Vec<_> = Vec::new();
 
     // Add the player marker
     markers.push(EntityMarker::Player);

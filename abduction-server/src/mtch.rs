@@ -15,6 +15,7 @@ use anyhow::Context;
 /// - Add queries and UI such that players can see the next upcoming match.
 ///
 use chrono::{Local, NaiveDateTime};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 use tokio::sync::broadcast;
@@ -43,10 +44,10 @@ pub struct MatchManager {
 }
 
 impl MatchManager {
-    pub fn load_match(match_config: MatchConfig, db: &Db) -> Self {
+    pub async fn load_match(match_config: MatchConfig, db: &Db) -> Self {
         // Create an entity manager and load the entities for the match
         let mut match_entities = EntityManager::new(&match_config.match_id);
-        match_entities.load_entities(db);
+        match_entities.load_entities(db).await;
 
         Self {
             match_config,
@@ -96,6 +97,21 @@ impl MatchManager {
     /// When a match is on, this is called every second or so to update the state of the world
     pub async fn perform_match_tick(&mut self, tick_tx: &broadcast::Sender<TickEvent>, db: &Db) {
         // TODO: implement actual actions, agents, world changes etc
+
+        // TEMP: for now just choose a random entity, and move it to the right
+        let ent_id = {
+            let all_ents: Vec<_> = self.match_entities.get_all_entities().collect();
+            let ent_i = rand::rng().random_range(0..all_ents.len());
+            all_ents[ent_i].entity_id.clone()
+        };
+
+        self.match_entities
+            .mutate(&ent_id, |e| {
+                if let Some(h) = e.attributes.hex.as_mut() {
+                    h.0 += 1;
+                }
+            })
+            .unwrap();
 
         // Flush changes to entities to the DB and to clients
         self.match_entities
@@ -163,6 +179,7 @@ impl MatchConfig {
     }
 
     /// Get one match config from the db
+    #[allow(unused)]
     pub async fn get(db: &Db, match_id: MatchId) -> anyhow::Result<Self> {
         sqlx::query_file_as!(Self, "queries/get_match_config.sql", match_id)
             .fetch_one(db)

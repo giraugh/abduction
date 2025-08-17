@@ -1,12 +1,17 @@
-use std::{collections::HashMap, ops::Deref};
+use std::{
+    collections::{HashMap, VecDeque},
+    ops::Deref,
+};
 
-use rand::{rng, Rng};
+use anyhow::{anyhow, Context};
 use serde::{Deserialize, Serialize};
 use sqlx::{query_file_as, types::Json};
 use tokio::sync::broadcast;
 use tracing::info;
 
+use super::{Entity, EntityId};
 use crate::{
+    entity::EntityPayload,
     mtch::{MatchId, TickEvent},
     Db,
 };
@@ -16,21 +21,29 @@ use crate::{
 ///
 /// NOTE: see also `EntityMutation` which is an equivalent struct
 ///       as represented in the db
+///
+/// ALLOW: ignore large size variant as `RemoveEntity` variant is likely much rarer
+///        but lets keep an eye on that - could potentially box the SetEntity variant instead
 #[derive(Debug, Clone, Serialize)]
 #[qubit::ts]
+#[allow(clippy::large_enum_variant)]
 pub enum EntityManagerMutation {
     /// Upsert an entity
     SetEntity(Entity),
 
     /// Delete an entity
+    #[allow(unused)]
     RemoveEntity(EntityId),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "text")]
 pub enum EntityMutationType {
     #[serde(rename = "S")]
+    #[sqlx(rename = "S")]
     Set,
     #[serde(rename = "D")]
+    #[sqlx(rename = "D")]
     Delete,
 }
 
@@ -80,7 +93,8 @@ pub struct EntityManager {
     entities: HashMap<EntityId, Entity>,
 
     /// Waiting mutations for flush
-    pending_mutations: Vec<EntityManagerMutation>,
+    /// (its a queue so we can do optimisations like removing a set for an entity that was also deleted)
+    pending_mutations: VecDeque<EntityManagerMutation>,
 }
 
 impl EntityManager {
@@ -146,18 +160,37 @@ impl EntityManager {
 
         // Store a mutation for later
         self.pending_mutations
-            .push(EntityManagerMutation::SetEntity(entity));
+            .push_back(EntityManagerMutation::SetEntity(entity));
 
         Ok(())
     }
 
+    pub fn mutate<F>(&mut self, entity_id: &EntityId, mutate: F) -> anyhow::Result<()>
+    where
+        F: FnOnce(&mut Entity),
+    {
+        // Get that entity
+        let entity = self
+            .entities
+            .get_mut(entity_id)
+            .ok_or(anyhow!("No such entity"))?;
+
+        // Update it
+        let mut entity_updated = entity.clone();
+        mutate(&mut entity_updated);
+        self.upsert_entity(entity_updated)?;
+
+        Ok(())
+    }
+
+    #[allow(unused)]
     pub fn remove_entity(&mut self, entity_id: &EntityId) -> anyhow::Result<()> {
         // Remove that an entity
         self.entities.remove(entity_id);
 
         // Store a mutation for later
         self.pending_mutations
-            .push(EntityManagerMutation::RemoveEntity(entity_id.clone()));
+            .push_back(EntityManagerMutation::RemoveEntity(entity_id.clone()));
 
         Ok(())
     }
@@ -175,7 +208,12 @@ impl EntityManager {
         // Otherwise, drain them all
         let pending_mutations: Vec<_> = self.pending_mutations.drain(0..).collect();
 
+        // TODO: de-dupe mutations affecting the same entity
+        //   - If the last op was a `D` -> dont send the initial sets, its just deleted
+        //   - If multiple sets for an entity, only keep the last one
+
         // Send changes to clients
+        // TODO: we could do JSON diffs here perhaps...
         tick_tx.send(TickEvent::EntityChanges {
             changes: pending_mutations.clone(),
         })?;
@@ -183,14 +221,18 @@ impl EntityManager {
         // Add changes to DB
         for mutation in pending_mutations {
             let mutation = EntityMutation::from_entity_manager_mutation(&self.match_id, mutation);
-            todo!()
-            // sqlx::query_file!("queries/add_match_mutations.sql")
-            //     .fetch(db)
-            //     .await;
+            let payload = Json(mutation.payload);
+            sqlx::query_file!(
+                "queries/add_match_mutation.sql",
+                mutation.entity_id,
+                mutation.match_id,
+                mutation.mutation_type,
+                payload,
+            )
+            .execute(db)
+            .await
+            .context("Failed to persist entity mutation to DB")?;
         }
-
-        // TODO: currently do nothing, but obviously we *should* do things here
-        // in particular, write to the DB and send to clients
 
         Ok(())
     }
@@ -200,169 +242,4 @@ impl EntityManager {
 struct AggregatedEntities {
     entity_id: EntityId,
     entity: Option<Json<EntityPayload>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-#[qubit::ts]
-pub enum EntityMarker {
-    /// Whether this represents a player agent
-    Player,
-
-    /// Whether this can be viewed in the client
-    Viewable,
-
-    /// Whether the player escaped on the ship
-    Escaped,
-}
-
-pub type CurrMax<T> = (T, T);
-pub type EntityId = String; // TODO: use a uuid
-
-/// An attribute which "motivates" behaviour for an entity
-/// primarily represented by a single 0-1 float
-/// entity can react differently to motivators, so they have a
-/// sensitity scalar which attenuates incoming "motiviation"
-///
-/// e.g if sensitivity is 0 for hunger -> that entity does not need to eat
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[qubit::ts]
-pub struct Motivator {
-    /// 0-1 motivation
-    motivation: f32,
-    /// 0-1 sensitivity
-    sensitivity: f32,
-}
-
-impl Motivator {
-    /// Get a motivator with randomly defined sensitivity
-    pub fn random() -> Self {
-        Self {
-            motivation: 0.0,
-            sensitivity: rng().random_range(0.2..=1.0),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[qubit::ts]
-pub struct EntityAttributes {
-    // Motivators...
-    pub hurt: Option<Motivator>,
-    pub hunger: Option<Motivator>,
-    pub thirst: Option<Motivator>,
-
-    /// The entity first name
-    pub first_name: Option<String>,
-
-    /// The entity family name
-    pub family_name: Option<String>,
-
-    /// How old the entity is in years
-    pub age: Option<usize>,
-
-    /// Which hex the entity is located in if applicable
-    pub hex: Option<(usize, usize)>,
-
-    /// A primary hue to use when displaying this entity
-    /// The value is a % out of 100 for use in HSL
-    /// (e.g for player dots)
-    pub display_color_hue: Option<f32>,
-}
-
-impl EntityAttributes {
-    /// Generate random motivators
-    pub fn random_motivators() -> Self {
-        Self {
-            hurt: Some(Motivator::random()),
-            hunger: Some(Motivator::random()),
-            thirst: Some(Motivator::random()),
-            ..Default::default()
-        }
-    }
-}
-
-/// A type of entity relation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[qubit::ts]
-pub enum RelationKind {
-    Friend,
-    Lover,
-    Child,
-    Ally,
-    Parent,
-    Holding,
-}
-
-/// A full entity including an id
-/// SEE ALSO: `EntityPayload`
-#[derive(Debug, Clone, Serialize)]
-#[qubit::ts]
-pub struct Entity {
-    /// The id of the entity
-    pub entity_id: EntityId,
-
-    /// A required name
-    pub name: String,
-
-    /// A set of unique "markers"
-    pub markers: Vec<EntityMarker>,
-
-    /// Grab bag of attributes
-    pub attributes: EntityAttributes,
-
-    /// Relations with other entities
-    pub relations: Vec<(RelationKind, EntityId)>,
-}
-
-/// An entity as stored in a payload on an entity_mutation row
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct EntityPayload {
-    /// A required name
-    pub name: String,
-
-    /// A set of unique "markers"
-    pub markers: Vec<EntityMarker>,
-
-    /// Grab bag of attributes
-    pub attributes: EntityAttributes,
-
-    /// Relations with other entities
-    pub relations: Vec<(RelationKind, EntityId)>,
-}
-
-impl EntityPayload {
-    pub fn convert_to_entity(self, entity_id: EntityId) -> Entity {
-        Entity {
-            entity_id,
-            attributes: self.attributes,
-            markers: self.markers,
-            name: self.name,
-            relations: self.relations,
-        }
-    }
-}
-
-impl From<Entity> for EntityPayload {
-    fn from(value: Entity) -> Self {
-        Self {
-            attributes: value.attributes,
-            markers: value.markers,
-            name: value.name,
-            relations: value.relations,
-        }
-    }
-}
-
-#[macro_export]
-macro_rules! has_markers {
-    ($e: expr, $marker: expr) => {{
-        use EntityMarker::*;
-        ($e).markers.contains(&$marker)
-    }};
-    ($e: expr, $marker: expr, $($markers: expr),+) => {{
-        use EntityMarker::*;
-        ($e).markers.contains(&$marker) && (has_markers!($e, $($markers),+))
-    }};
 }
