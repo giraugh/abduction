@@ -1,3 +1,4 @@
+mod brain;
 mod entity;
 mod mtch;
 mod player_gen;

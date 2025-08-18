@@ -63,7 +63,7 @@ pub struct EntityAttributes {
     pub age: Option<usize>,
 
     /// Which hex the entity is located in if applicable
-    pub hex: Option<(usize, usize)>,
+    pub hex: Option<(isize, isize)>,
 
     /// A primary hue to use when displaying this entity
     /// The value is a % out of 100 for use in HSL
