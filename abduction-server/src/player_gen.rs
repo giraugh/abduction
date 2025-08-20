@@ -5,6 +5,7 @@ use std::str::FromStr;
 use std::{io::SeekFrom, os::unix::fs::MetadataExt, path::PathBuf};
 use uuid::Uuid;
 
+use crate::entity::motivator::MotivatorTable;
 use crate::entity::{Entity, EntityAttributes, EntityMarker};
 
 const NAMES_DIR: &str = "../gather-player-data/output";
@@ -42,7 +43,10 @@ pub fn generate_player() -> anyhow::Result<Entity> {
 
     // Generate some random player attributes
     // (primarily motivators but a few others)
-    let mut attributes = EntityAttributes::random_motivators();
+    let mut attributes = EntityAttributes {
+        motivators: MotivatorTable::random(),
+        ..Default::default()
+    };
 
     // Update the age to what we generated earlier
     attributes.age = Some(age);

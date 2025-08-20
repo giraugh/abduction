@@ -1,8 +1,11 @@
 pub mod manager;
+pub mod motivator;
+
 pub use manager::*;
 
-use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
+
+use crate::entity::motivator::MotivatorTable;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -20,38 +23,11 @@ pub enum EntityMarker {
 
 pub type EntityId = String; // TODO: use a uuid
 
-/// An attribute which "motivates" behaviour for an entity
-/// primarily represented by a single 0-1 float
-/// entity can react differently to motivators, so they have a
-/// sensitity scalar which attenuates incoming "motiviation"
-///
-/// e.g if sensitivity is 0 for hunger -> that entity does not need to eat
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[qubit::ts]
-pub struct Motivator {
-    /// 0-1 motivation
-    motivation: f32,
-    /// 0-1 sensitivity
-    sensitivity: f32,
-}
-
-impl Motivator {
-    /// Get a motivator with randomly defined sensitivity
-    pub fn random() -> Self {
-        Self {
-            motivation: 0.0,
-            sensitivity: rng().random_range(0.2..=1.0),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[qubit::ts]
 pub struct EntityAttributes {
-    // Motivators...
-    pub hurt: Option<Motivator>,
-    pub hunger: Option<Motivator>,
-    pub thirst: Option<Motivator>,
+    /// Nested motivators
+    pub motivators: MotivatorTable,
 
     /// The entity first name
     pub first_name: Option<String>,
@@ -69,18 +45,6 @@ pub struct EntityAttributes {
     /// The value is a % out of 100 for use in HSL
     /// (e.g for player dots)
     pub display_color_hue: Option<f32>,
-}
-
-impl EntityAttributes {
-    /// Generate random motivators
-    pub fn random_motivators() -> Self {
-        Self {
-            hurt: Some(Motivator::random()),
-            hunger: Some(Motivator::random()),
-            thirst: Some(Motivator::random()),
-            ..Default::default()
-        }
-    }
 }
 
 /// A type of entity relation
