@@ -21,6 +21,9 @@ pub enum EntityMarker {
     /// Whether the player escaped on the ship
     Escaped,
 
+    /// The corpse of a player
+    Corpse,
+
     /// Something which hurts the players when interacted with
     Hazard,
 }

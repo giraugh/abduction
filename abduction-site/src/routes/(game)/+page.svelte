@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { MotivatorKey } from '$lib/api.gen';
+	import type { EntityMarker, MotivatorKey } from '$lib/api.gen';
 	import { axialHexRange, axialToPixel, entityColor, HEX_SIZE, hexagonPoints } from '$lib/display';
 	import { game } from '$lib/game.svelte';
 	import { capitalize, pluralize } from '@giraugh/tools';
@@ -14,7 +14,23 @@
 	// TODO: from some kind of config
 	let worldRadius = $derived(game.config?.world_radius ?? 0);
 	let limits = $derived(HEX_SIZE * worldRadius * 2);
+
+	let entityCount = $derived(game.entities.size);
+	let playerCount = $derived(
+		Array.from(game.entities.values()).filter((e) => e.markers.includes('player')).length
+	);
+
+	function emojiFromMarkers(markers: EntityMarker[]) {
+		if (markers.includes('corpse')) return '💀';
+		if (markers.includes('hazard')) return '🔥';
+		if (markers.includes('player')) return '🤷‍♂️';
+		return '';
+	}
 </script>
+
+<svelte:head>
+	<title>Abduction</title>
+</svelte:head>
 
 <div class="wrapper">
 	<div class="svg-container">
@@ -44,9 +60,14 @@
 
 	<div class="sidebar">
 		<!-- For now, just dump all the entities here -->
-		<h2>{game.entities.size} {pluralize('entity', game.entities.size, 'entities')}</h2>
+		<h2>
+			<span>{entityCount} {pluralize('entity', entityCount, 'entities')}</span>
+			<span>/</span>
+			<span>{playerCount} {pluralize('player', playerCount, 'players')}</span>
+		</h2>
 		<ul class="entity-list">
-			{#each game.entities as [entityId, entity] (entityId)}
+			{#each Array.from(game.entities.keys()).toSorted() as entityId (entityId)}
+				{@const entity = game.entities.get(entityId)!}
 				{#if entity.markers.includes('viewable')}
 					<li>
 						<button
@@ -57,7 +78,7 @@
 								} else {
 									selectedEntity = entityId;
 								}
-							}}>{entity.name}</button
+							}}>{emojiFromMarkers(entity.markers)} {entity.name}</button
 						>
 					</li>
 				{/if}
@@ -91,8 +112,6 @@
 						{/each}
 					</tbody>
 				</table>
-			{:else}
-				<strong>Entity is deceased</strong>
 			{/if}
 		{/if}
 	</div>

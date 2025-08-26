@@ -153,8 +153,23 @@ impl MatchManager {
                     // Go update it
                     match self.resolve_player_action(&mut player) {
                         Some(PlayerActionSideEffect::Death) => {
+                            // Remove that player entity
                             self.match_entities
                                 .remove_entity(&player.entity_id)
+                                .unwrap();
+
+                            // TODO: add a corpse
+                            self.match_entities
+                                .upsert_entity(Entity {
+                                    entity_id: Entity::id(),
+                                    markers: vec![EntityMarker::Viewable, EntityMarker::Corpse],
+                                    name: format!("Corpse of {}", &player.name),
+                                    attributes: EntityAttributes {
+                                        hex: player.attributes.hex,
+                                        ..Default::default()
+                                    },
+                                    ..Default::default()
+                                })
                                 .unwrap();
                         }
                         None => {

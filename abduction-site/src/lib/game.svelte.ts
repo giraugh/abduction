@@ -22,6 +22,8 @@ class Game {
 				}
 
 				if (change.kind === 'remove_entity') {
+					// TODO: there's probably something to be said about storing this differently
+					// so that you can still browse everything about the entity in the client... hmmm...
 					this.entities.delete(change.entity_id);
 				}
 			}
