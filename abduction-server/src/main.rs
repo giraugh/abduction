@@ -1,32 +1,50 @@
 mod brain;
 mod entity;
+mod hex;
 mod mtch;
 mod player_gen;
 
 use futures::{Stream, StreamExt};
 use qubit::{handler, Router};
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool};
-use std::{env, net::SocketAddr, str::FromStr};
-use tokio::net::TcpListener;
+use std::{env, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::sync::broadcast;
 use tokio::time::Duration;
+use tokio::{net::TcpListener, sync::Mutex};
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tracing::{debug, info, level_filters::LevelFilter};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
+use crate::entity::Entity;
 use crate::mtch::{MatchConfig, MatchManager, TickEvent};
 
-const TICK_DELAY: Duration = Duration::from_secs(1);
+const TICK_DELAY: Duration = Duration::from_millis(500);
 
 pub type Db = Pool<Sqlite>;
 
 /// The context type for qubit
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct QubitCtx {
     tick_tx: broadcast::Sender<TickEvent>,
+    match_manager: Arc<Mutex<MatchManager>>,
 }
 
+/// Get the current state of all entities
+#[handler(query)]
+async fn get_entity_states(ctx: QubitCtx) -> Vec<Entity> {
+    let match_manager = ctx.match_manager.lock().await;
+    match_manager.all_entity_states()
+}
+
+/// Get the config for the current match
+#[handler(query)]
+async fn get_match_config(ctx: QubitCtx) -> MatchConfig {
+    let match_manager = ctx.match_manager.lock().await;
+    match_manager.match_config.clone()
+}
+
+/// Get a stream of all tick events
 #[handler(subscription)]
 async fn events_stream(ctx: QubitCtx) -> impl Stream<Item = TickEvent> {
     let stream = tokio_stream::wrappers::BroadcastStream::new(ctx.tick_tx.subscribe());
@@ -46,7 +64,10 @@ async fn main() {
         .init();
 
     // Create a qubit router
-    let router = Router::new().handler(events_stream);
+    let router = Router::new()
+        .handler(get_entity_states)
+        .handler(get_match_config)
+        .handler(events_stream);
 
     // Generate ts types
     info!("Writing ts bindings");
@@ -75,7 +96,7 @@ async fn main() {
     // #NOTE: #HACK: during dev, we just create a new isolated match each time
     //               we restart
     info!("Creating new match config for development");
-    let dev_match = MatchConfig::isolated(100);
+    let dev_match = MatchConfig::isolated(30, 15);
     dev_match
         .save(&db)
         .await
@@ -93,8 +114,10 @@ async fn main() {
     let (tick_tx, mut tick_rx) = broadcast::channel::<TickEvent>(10);
 
     // Create service and handle
+    let match_manager = Arc::new(Mutex::new(match_manager));
     let (qubit_service, qubit_handle) = router.into_service(QubitCtx {
         tick_tx: tick_tx.clone(),
+        match_manager: match_manager.clone(),
     });
 
     // Nest into an Axum router
@@ -108,6 +131,7 @@ async fn main() {
     tracker.spawn({
         let token = token.clone();
 
+        let match_manager = match_manager.clone();
         let start_loop = async move {
             let mut tick_count = 0;
             loop {
@@ -118,7 +142,10 @@ async fn main() {
                     .expect("Cannot send start of tick event");
 
                 // Run the next tick
-                match_manager.perform_match_tick(&tick_tx, &db).await;
+                {
+                    let mut mm = match_manager.lock().await;
+                    mm.perform_match_tick(&tick_tx, &db).await;
+                }
 
                 // Tell em we finished the tick
                 tick_tx

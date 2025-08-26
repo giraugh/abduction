@@ -7,6 +7,7 @@ edition = "2021"
 anyhow = "1.0.98"
 axum = "0.8.4"
 chrono = { version = "0.4.41", features = ["serde"] }
+derive_more = { version = "2.0.1", features = ["from", "into", "add", "mul", "add_assign", "mul_assign"] }
 futures = "0.3.31"
 hyper = { version = "1.6.0", features = ["server"] }
 itertools = "0.14.0"

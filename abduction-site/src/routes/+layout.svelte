@@ -11,4 +11,6 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-{@render children?.()}
+<div class="wrapper">
+	{@render children?.()}
+</div>

@@ -27,13 +27,14 @@ use crate::{
 #[derive(Debug, Clone, Serialize)]
 #[qubit::ts]
 #[allow(clippy::large_enum_variant)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EntityManagerMutation {
     /// Upsert an entity
-    SetEntity(Entity),
+    SetEntity { entity: Entity },
 
     /// Delete an entity
     #[allow(unused)]
-    RemoveEntity(EntityId),
+    RemoveEntity { entity_id: EntityId },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
@@ -62,13 +63,13 @@ impl EntityMutation {
         mutation: EntityManagerMutation,
     ) -> Self {
         match mutation {
-            EntityManagerMutation::SetEntity(entity) => Self {
+            EntityManagerMutation::SetEntity { entity } => Self {
                 entity_id: entity.entity_id.clone(),
                 match_id: match_id.clone(),
                 mutation_type: EntityMutationType::Set,
                 payload: Some(entity.into()),
             },
-            EntityManagerMutation::RemoveEntity(entity_id) => Self {
+            EntityManagerMutation::RemoveEntity { entity_id } => Self {
                 entity_id,
                 match_id: match_id.clone(),
                 mutation_type: EntityMutationType::Delete,
@@ -160,7 +161,7 @@ impl EntityManager {
 
         // Store a mutation for later
         self.pending_mutations
-            .push_back(EntityManagerMutation::SetEntity(entity));
+            .push_back(EntityManagerMutation::SetEntity { entity });
 
         Ok(())
     }
@@ -190,7 +191,9 @@ impl EntityManager {
 
         // Store a mutation for later
         self.pending_mutations
-            .push_back(EntityManagerMutation::RemoveEntity(entity_id.clone()));
+            .push_back(EntityManagerMutation::RemoveEntity {
+                entity_id: entity_id.clone(),
+            });
 
         Ok(())
     }

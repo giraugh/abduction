@@ -1,8 +1,8 @@
 SELECT
     match_id,
-    player_count,
+    player_count as "player_count: i32",
     preceding_match_id,
-    created_at
+    world_radius as "world_radius: i32"
 FROM
     match_config
 WHERE

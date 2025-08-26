@@ -10,6 +10,10 @@ CREATE TABLE match_config (
     -- be cloned into this match
     preceding_match_id TEXT,
 
+    --- How many hexagons in each direction the world extents to
+    --- Sort of like a hexagon radius
+    world_radius INTEGER NOT NULL,
+
     -- When the configuration was created
     -- For now, this is used to identity the most current match
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP

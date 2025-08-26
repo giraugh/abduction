@@ -41,7 +41,7 @@ pub type MatchId = String;
 pub type TickId = usize;
 
 pub struct MatchManager {
-    match_config: MatchConfig,
+    pub match_config: MatchConfig,
     match_entities: EntityManager,
 }
 
@@ -95,6 +95,10 @@ impl MatchManager {
         Ok(())
     }
 
+    pub fn all_entity_states(&self) -> Vec<Entity> {
+        self.match_entities.get_all_entities().cloned().collect()
+    }
+
     /// Perform one game tick
     /// When a match is on, this is called every second or so to update the state of the world
     pub async fn perform_match_tick(&mut self, tick_tx: &broadcast::Sender<TickEvent>, db: &Db) {
@@ -142,7 +146,7 @@ impl MatchManager {
 
     fn resolve_player_action(&self, player: &mut Entity) {
         let action = player.get_next_action();
-        player.resolve_action(action);
+        player.resolve_action(action, &self.match_config);
     }
 }
 

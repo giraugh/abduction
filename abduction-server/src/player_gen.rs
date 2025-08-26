@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::entity::motivator::MotivatorTable;
 use crate::entity::{Entity, EntityAttributes, EntityMarker};
+use crate::hex::AxialHex;
 
 const NAMES_DIR: &str = "../gather-player-data/output";
 const FAMILY_NAMES_PATH: &str = "../gather-player-data/output/family_names.txt";
@@ -60,7 +61,7 @@ pub fn generate_player() -> anyhow::Result<Entity> {
 
     // Encode the players location
     // which we default to the world origin
-    attributes.hex = Some((0, 0));
+    attributes.hex = Some(AxialHex::ZERO);
 
     // So we can show them on the screen, assign them a colour
     // fairly arbitrary right now I think...

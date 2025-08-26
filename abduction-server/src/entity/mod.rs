@@ -5,7 +5,7 @@ pub use manager::*;
 
 use serde::{Deserialize, Serialize};
 
-use crate::entity::motivator::MotivatorTable;
+use crate::{entity::motivator::MotivatorTable, hex::AxialHex};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -39,7 +39,7 @@ pub struct EntityAttributes {
     pub age: Option<usize>,
 
     /// Which hex the entity is located in if applicable
-    pub hex: Option<(isize, isize)>,
+    pub hex: Option<AxialHex>,
 
     /// A primary hue to use when displaying this entity
     /// The value is a % out of 100 for use in HSL

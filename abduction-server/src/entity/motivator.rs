@@ -24,7 +24,7 @@ impl MotivatorData {
     pub fn random() -> Self {
         Self {
             motivation: 0.0,
-            sensitivity: rng().random_range(0.2..=1.0),
+            sensitivity: rng().random_range(0.05..=0.5),
         }
     }
 }

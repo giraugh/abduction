@@ -1,36 +1,13 @@
-use rand::{
-    distr::{weighted::WeightedIndex, Distribution},
-    Rng,
+use rand::distr::{weighted::WeightedIndex, Distribution};
+
+use crate::{
+    entity::{
+        motivator::{self},
+        Entity,
+    },
+    hex::AxialHexDirection,
+    mtch::MatchConfig,
 };
-use serde::Serialize;
-
-use crate::entity::{
-    motivator::{self, MotivatorKey},
-    Entity,
-};
-
-#[derive(Debug, Clone, Serialize)]
-pub enum HexDirection {
-    East,
-    West,
-    NorthEast,
-    NorthWest,
-    SouthEast,
-    SouthWest,
-}
-
-impl HexDirection {
-    pub fn cartesian_offset(&self) -> (isize, isize) {
-        match self {
-            HexDirection::East => (1, 0),
-            HexDirection::West => (-1, 0),
-            HexDirection::NorthEast => (1, -1),
-            HexDirection::NorthWest => (0, -1),
-            HexDirection::SouthEast => (0, 1),
-            HexDirection::SouthWest => (-1, -1),
-        }
-    }
-}
 
 #[derive(Clone, Debug)]
 pub enum PlayerAction {
@@ -39,7 +16,7 @@ pub enum PlayerAction {
     Nothing,
 
     /// Move to a new hex
-    Move(HexDirection),
+    Move(AxialHexDirection),
 }
 
 impl PlayerAction {
@@ -47,12 +24,12 @@ impl PlayerAction {
     pub const fn all_movements() -> &'static [Self] {
         use PlayerAction::*;
         &[
-            Move(HexDirection::East),
-            Move(HexDirection::NorthEast),
-            Move(HexDirection::SouthEast),
-            Move(HexDirection::West),
-            Move(HexDirection::NorthWest),
-            Move(HexDirection::SouthWest),
+            Move(AxialHexDirection::East),
+            Move(AxialHexDirection::NorthEast),
+            Move(AxialHexDirection::SouthEast),
+            Move(AxialHexDirection::West),
+            Move(AxialHexDirection::NorthWest),
+            Move(AxialHexDirection::SouthWest),
         ]
     }
 }
@@ -70,6 +47,8 @@ impl Entity {
             return PlayerAction::Nothing;
         }
 
+        // TODO: remove impossible actions such as out-of-bounds movement here
+
         // Create a weighted distribution over the actions
         let dist = WeightedIndex::new(&weights).unwrap();
 
@@ -78,7 +57,7 @@ impl Entity {
         actions[dist.sample(&mut rng)].clone()
     }
 
-    pub fn resolve_action(&mut self, action: PlayerAction) {
+    pub fn resolve_action(&mut self, action: PlayerAction, config: &MatchConfig) {
         match &action {
             PlayerAction::Nothing => {}
             PlayerAction::Move(hex_direction) => {
@@ -87,9 +66,10 @@ impl Entity {
                     .hex
                     .as_mut()
                     .expect("Cannot move without hex attribute");
-                let offset = hex_direction.cartesian_offset();
-                hex.0 += offset.0;
-                hex.1 += offset.1;
+                let new_hex = *hex + (*hex_direction).into();
+                if new_hex.within_bounds(config.world_radius as isize) {
+                    *hex = new_hex;
+                }
             }
         }
 
