@@ -170,6 +170,7 @@ impl EntityManager {
         Ok(())
     }
 
+    #[allow(unused)]
     pub fn mutate<F>(&mut self, entity_id: &EntityId, mutate: F) -> anyhow::Result<()>
     where
         F: FnOnce(&mut Entity),

@@ -3,7 +3,6 @@ use std::fs::{self, File};
 use std::io::{BufReader, Read, Seek};
 use std::str::FromStr;
 use std::{io::SeekFrom, os::unix::fs::MetadataExt, path::PathBuf};
-use uuid::Uuid;
 
 use crate::entity::motivator::MotivatorTable;
 use crate::entity::{Entity, EntityAttributes, EntityMarker};

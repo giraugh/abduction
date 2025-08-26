@@ -18,6 +18,7 @@ pub struct MatchConfig {
     /// The number of players in the match
     ///  - Players will be copied across from predecessor match if appropriate,
     ///  - otherwise new players will be generated when the match is setup
+    ///
     /// TODO: I really want this to be unsigned...
     pub player_count: i32,
 
