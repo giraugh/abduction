@@ -41,6 +41,19 @@ impl MotivatorTable {
     pub fn insert<K: MotivatorTableKey>(&mut self, data: MotivatorData) {
         self.0.insert(K::TABLE_KEY, data);
     }
+
+    /// Increment a motivator by the sensitivity
+    pub fn bump<K: MotivatorTableKey>(&mut self) {
+        let data = self.0.get_mut(&K::TABLE_KEY).unwrap();
+        data.motivation = (data.motivation + data.sensitivity).clamp(0.0, 1.0);
+    }
+
+    /// Decrement a motivator by the standard rate
+    /// for now they always go down by 0.2
+    pub fn reduce<K: MotivatorTableKey>(&mut self) {
+        let data = self.0.get_mut(&K::TABLE_KEY).unwrap();
+        data.motivation = (data.motivation - 0.2).clamp(0.0, 1.0);
+    }
 }
 
 macro_rules! declare_motivators {
@@ -57,7 +70,7 @@ macro_rules! declare_motivators {
 
         // Then declare each struct
         $(
-            struct $keys;
+            pub struct $keys;
             impl MotivatorTableKey for $keys {
                 const TABLE_KEY: MotivatorKey = MotivatorKey::$keys;
             }
@@ -71,6 +84,18 @@ macro_rules! declare_motivators {
                 table
             }
 
+            /// Get the weighted actions from ALL THE MOTIVATORS
+            pub fn get_weighted_actions(&self) -> Vec<(usize, PlayerAction)> {
+                let mut actions = Vec::new();
+                $(
+                    {
+                      let behaviour_data = self.0.get(&$keys::TABLE_KEY).unwrap(); // TODO: actually handle missing motivators here
+                      actions.extend($keys::get_weighted_actions(behaviour_data.motivation).into_iter());
+                    }
+                )*
+                actions
+            }
+
             $($(
                 pub fn $accessor(&mut self) -> &mut MotivatorData {
                     self.0.get_mut(&MotivatorKey::$keys).expect("Expected motivator $keys to be present")
@@ -80,15 +105,52 @@ macro_rules! declare_motivators {
     }
 }
 
-declare_motivators!({ Hunger, Thirst });
+declare_motivators!({ Hunger, Thirst, Boredom });
+
+// TODO:
+//  - there's a world here where a motivator actually wants to emit a list of actions for each weight like
+//    suppose you're hungry, I might create a set of actions like (EatFood, FindFood) that will eat food if we have it or otherwise find food
+//    but I guess that could be encoded as a EatOrFindFood action... yeah...
 
 pub trait MotivatorBehaviour {
-    fn get_weighted_actions() -> Vec<(usize, PlayerAction)>;
+    fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)>;
 }
 
 impl MotivatorBehaviour for Hunger {
-    fn get_weighted_actions() -> Vec<(usize, PlayerAction)> {
-        // TODO:
+    fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
+        // If not hungry, dont vote for anything
+        // (this should prob be a breakpoint like 0.1 instead ig)
+        if motivation == 0.0 {
+            return Vec::new();
+        }
+
         todo!()
+    }
+}
+
+impl MotivatorBehaviour for Thirst {
+    fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
+        // If not hungry, dont vote for anything
+        // (this should prob be a breakpoint like 0.1 instead ig)
+        if motivation == 0.0 {
+            return Vec::new();
+        }
+
+        todo!()
+    }
+}
+
+impl MotivatorBehaviour for Boredom {
+    fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
+        // If bored enough, do a random movement
+        if motivation > 0.5 {
+            return PlayerAction::all_movements()
+                .iter()
+                .cloned()
+                .map(|action| (1, action))
+                .collect();
+        }
+
+        Vec::new()
     }
 }

@@ -16,7 +16,10 @@ pub mod config;
 pub use config::*;
 
 use itertools::Itertools;
-use rand::{seq::SliceRandom, Rng};
+use rand::{
+    seq::{IndexedRandom, SliceRandom},
+    Rng,
+};
 use serde::Serialize;
 use tokio::sync::broadcast;
 use tracing::info;
@@ -104,13 +107,12 @@ impl MatchManager {
             .filter(|e| has_markers!(e, Player))
             .cloned() // :(
             .into_group_map_by(|e| e.attributes.hex.unwrap());
-        for (_hex, mut players) in players_in_hexes {
+        for (_hex, players) in players_in_hexes {
             let mut rng = rand::rng();
 
             // World acting on players in this hex
             {
-                players.shuffle(&mut rng);
-                if let Some(entity) = players.last() {
+                if let Some(entity) = players.choose(&mut rng) {
                     let mut player = entity.clone();
                     self.resolve_world_effect_on_player(&mut player);
                     self.match_entities.upsert_entity(player).unwrap();
@@ -119,8 +121,7 @@ impl MatchManager {
 
             // Player actions in this hex
             {
-                players.shuffle(&mut rng);
-                if let Some(entity) = players.last() {
+                if let Some(entity) = players.choose(&mut rng) {
                     let mut player = entity.clone();
                     self.resolve_player_action(&mut player);
                     self.match_entities.upsert_entity(player).unwrap();

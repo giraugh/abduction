@@ -1,7 +1,13 @@
-use rand::Rng;
+use rand::{
+    distr::{weighted::WeightedIndex, Distribution},
+    Rng,
+};
 use serde::Serialize;
 
-use crate::entity::Entity;
+use crate::entity::{
+    motivator::{self, MotivatorKey},
+    Entity,
+};
 
 #[derive(Debug, Clone, Serialize)]
 pub enum HexDirection {
@@ -36,41 +42,45 @@ pub enum PlayerAction {
     Move(HexDirection),
 }
 
-impl Entity {
-    /// Determine the next action to be taken by an entity
-    /// Only applicable for players
-    pub fn get_next_action(&self) -> PlayerAction {
+impl PlayerAction {
+    #[inline(always)]
+    pub const fn all_movements() -> &'static [Self] {
         use PlayerAction::*;
-
-        // HACK: For now just chooses a random valid action
-        let mut possible_actions = Vec::new();
-
-        // And doing nothing
-        possible_actions.push(Nothing);
-
-        // Add movements
-        possible_actions.extend(vec![
+        &[
             Move(HexDirection::East),
             Move(HexDirection::NorthEast),
             Move(HexDirection::SouthEast),
             Move(HexDirection::West),
             Move(HexDirection::NorthWest),
             Move(HexDirection::SouthWest),
-        ]);
+        ]
+    }
+}
 
-        // Then choose a random one
+impl Entity {
+    /// Determine the next action to be taken by an entity
+    /// Only applicable for players
+    pub fn get_next_action(&self) -> PlayerAction {
+        // Get the weighted actions from each motivator
+        let action_weights = self.attributes.motivators.get_weighted_actions();
+        let (weights, actions): (Vec<_>, Vec<_>) = action_weights.into_iter().unzip();
+
+        // If we have no actions, do nothing
+        if actions.is_empty() {
+            return PlayerAction::Nothing;
+        }
+
+        // Create a weighted distribution over the actions
+        let dist = WeightedIndex::new(&weights).unwrap();
+
+        // Sample the distribution
         let mut rng = rand::rng();
-        let action_index = rng.random_range(0..possible_actions.len());
-        possible_actions[action_index].clone()
+        actions[dist.sample(&mut rng)].clone()
     }
 
     pub fn resolve_action(&mut self, action: PlayerAction) {
-        match action {
-            PlayerAction::Nothing => {
-                // possible a "boredom" side-effect?
-                // TODO:
-                // action_log!("actions/do_nothing", subject = entity.id);
-            }
+        match &action {
+            PlayerAction::Nothing => {}
             PlayerAction::Move(hex_direction) => {
                 let hex = self
                     .attributes
@@ -80,6 +90,16 @@ impl Entity {
                 let offset = hex_direction.cartesian_offset();
                 hex.0 += offset.0;
                 hex.1 += offset.1;
+            }
+        }
+
+        // If the action was do nothing, get bored, otherwise get less bored
+        match action {
+            PlayerAction::Nothing => {
+                self.attributes.motivators.bump::<motivator::Boredom>();
+            }
+            _ => {
+                self.attributes.motivators.reduce::<motivator::Boredom>();
             }
         }
     }
