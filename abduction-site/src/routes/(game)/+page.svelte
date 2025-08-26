@@ -2,7 +2,7 @@
 	import type { MotivatorKey } from '$lib/api.gen';
 	import { axialHexRange, axialToPixel, entityColor, HEX_SIZE, hexagonPoints } from '$lib/display';
 	import { game } from '$lib/game.svelte';
-	import { capitalize } from '@giraugh/tools';
+	import { capitalize, pluralize } from '@giraugh/tools';
 
 	let selectedEntity = $state<string | null>(null);
 
@@ -44,13 +44,20 @@
 
 	<div class="sidebar">
 		<!-- For now, just dump all the entities here -->
+		<h2>{game.entities.size} {pluralize('entity', game.entities.size, 'entities')}</h2>
 		<ul class="entity-list">
 			{#each game.entities as [entityId, entity] (entityId)}
 				{#if entity.markers.includes('viewable')}
 					<li>
 						<button
 							class:selected={entityId === selectedEntity}
-							onclick={() => (selectedEntity = entityId)}>{entity.name}</button
+							onclick={() => {
+								if (selectedEntity === entityId) {
+									selectedEntity = null;
+								} else {
+									selectedEntity = entityId;
+								}
+							}}>{entity.name}</button
 						>
 					</li>
 				{/if}
@@ -58,23 +65,35 @@
 		</ul>
 
 		{#if selectedEntity !== null}
-			{@const entity = game.entities.get(selectedEntity)!}
-			{@const loc = entity.attributes.hex ? axialToCompass(entity.attributes.hex) : 'unknown'}
-			{@const motivators = entity.attributes.motivators}
-			<hr />
-			<h2>{entity.name} <span class="color-dot" style:background={entityColor(entity)}></span></h2>
-			<table class="attribute-table">
-				<tbody>
-					<tr><td>Age</td><td>{entity.attributes.age}</td></tr>
-					<tr><td>Location</td><td>{loc}</td></tr>
-					{#each Object.keys(motivators) as motivatorKey (motivatorKey)}
-						{@const key = motivatorKey as MotivatorKey}
-						{@const motivator = motivators[key]!}
-						{@const motivation = Math.floor(motivator.motivation * 100)}
-						<tr><td>{capitalize(motivatorKey)}</td><td>{motivation}%</td></tr>
-					{/each}
-				</tbody>
-			</table>
+			{@const entity = game.entities.get(selectedEntity)}
+			{#if entity}
+				{@const loc = entity.attributes.hex ? axialToCompass(entity.attributes.hex) : 'unknown'}
+				{@const motivators = entity.attributes.motivators}
+				<hr />
+				<h2>
+					{entity.name} <span class="color-dot" style:background={entityColor(entity)}></span>
+				</h2>
+				<table class="attribute-table">
+					<tbody>
+						{#if entity.attributes.age !== null}
+							<tr><td>Age</td><td>{entity.attributes.age}</td></tr>
+						{/if}
+
+						{#if entity.attributes.hex !== null}
+							<tr><td>Location</td><td>{loc}</td></tr>
+						{/if}
+
+						{#each Object.keys(motivators).toSorted() as motivatorKey (motivatorKey)}
+							{@const key = motivatorKey as MotivatorKey}
+							{@const motivator = motivators[key]!}
+							{@const motivation = Math.floor(motivator.motivation * 100)}
+							<tr><td>{capitalize(motivatorKey)}</td><td>{motivation}%</td></tr>
+						{/each}
+					</tbody>
+				</table>
+			{:else}
+				<strong>Entity is deceased</strong>
+			{/if}
 		{/if}
 	</div>
 </div>

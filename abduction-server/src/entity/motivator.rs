@@ -105,7 +105,7 @@ macro_rules! declare_motivators {
     }
 }
 
-declare_motivators!({ Hunger, Thirst, Boredom });
+declare_motivators!({ Hunger, Thirst, Boredom, Hurt });
 
 // TODO:
 //  - there's a world here where a motivator actually wants to emit a list of actions for each weight like
@@ -149,6 +149,17 @@ impl MotivatorBehaviour for Boredom {
                 .cloned()
                 .map(|action| (1, action))
                 .collect();
+        }
+
+        Vec::new()
+    }
+}
+
+impl MotivatorBehaviour for Hurt {
+    fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
+        // If fully "motivated" then die
+        if motivation >= 0.99 {
+            return vec![(100, PlayerAction::Death)];
         }
 
         Vec::new()

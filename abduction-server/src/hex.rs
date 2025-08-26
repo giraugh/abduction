@@ -1,3 +1,4 @@
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 /// Store an `(q, r)` value for a hex location
@@ -28,6 +29,16 @@ impl AxialHex {
     pub const NORTH_WEST: AxialHex = AxialHex(0, -1);
     pub const SOUTH_EAST: AxialHex = AxialHex(0, 1);
     pub const SOUTH_WEST: AxialHex = AxialHex(-1, 1);
+
+    pub fn random_in_bounds(rng: &mut impl Rng, radius: isize) -> Self {
+        let x = (rng.random_range(0..=2 * (radius as usize)) as isize) - radius;
+        let min_y = isize::max(-radius, -x - radius);
+        let max_y = isize::min(radius, -x + radius);
+        let y = (rng.random_range(0..=(max_y - min_y) as usize) as isize) + min_y;
+        let z = -x - y;
+
+        Self(x, z)
+    }
 
     /// Get a `(q, r, s)` cube coordinate by deriving the `s` value
     pub fn as_cube_coordinate(&self) -> (isize, isize, isize) {

@@ -1,4 +1,5 @@
 use rand::distr::{weighted::WeightedIndex, Distribution};
+use tracing::info;
 
 use crate::{
     entity::{
@@ -15,8 +16,17 @@ pub enum PlayerAction {
     /// "<player> twiddles their thumbs" etc
     Nothing,
 
+    /// Die and be removed from the game
+    Death,
+
     /// Move to a new hex
     Move(AxialHexDirection),
+}
+
+/// Something that happens to the world as a result of player action
+#[derive(Clone, Debug)]
+pub enum PlayerActionSideEffect {
+    Death,
 }
 
 impl PlayerAction {
@@ -57,9 +67,16 @@ impl Entity {
         actions[dist.sample(&mut rng)].clone()
     }
 
-    pub fn resolve_action(&mut self, action: PlayerAction, config: &MatchConfig) {
+    pub fn resolve_action(
+        &mut self,
+        action: PlayerAction,
+        config: &MatchConfig,
+    ) -> Option<PlayerActionSideEffect> {
         match &action {
             PlayerAction::Nothing => {}
+            PlayerAction::Death => {
+                return Some(PlayerActionSideEffect::Death);
+            }
             PlayerAction::Move(hex_direction) => {
                 let hex = self
                     .attributes
@@ -82,5 +99,7 @@ impl Entity {
                 self.attributes.motivators.reduce::<motivator::Boredom>();
             }
         }
+
+        None
     }
 }

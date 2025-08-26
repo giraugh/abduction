@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context};
 use serde::{Deserialize, Serialize};
 use sqlx::{query_file_as, types::Json};
 use tokio::sync::broadcast;
-use tracing::info;
+use tracing::{debug, info};
 
 use super::{Entity, EntityId};
 use crate::{
@@ -105,6 +105,10 @@ impl EntityManager {
             entities: HashMap::default(),
             pending_mutations: Default::default(),
         }
+    }
+
+    pub fn get_entity(&self, entity_id: &EntityId) -> Option<Entity> {
+        self.entities.get(entity_id).cloned()
     }
 
     pub fn get_all_entities(&self) -> impl Iterator<Item = &Entity> {
@@ -238,7 +242,7 @@ impl EntityManager {
             .context("Failed to persist entity mutation to DB")?;
         }
 
-        info!("Flushed {mutation_count} pending mutation(s)");
+        debug!("Flushed {mutation_count} pending mutation(s)");
         Ok(())
     }
 }

@@ -16,17 +16,18 @@ pub mod config;
 pub use config::*;
 
 use itertools::Itertools;
-use rand::{
-    seq::{IndexedRandom, SliceRandom},
-    Rng,
-};
+use rand::seq::IndexedRandom;
 use serde::Serialize;
 use tokio::sync::broadcast;
 use tracing::info;
 
 use crate::{
-    entity::{Entity, EntityManager, EntityManagerMutation, EntityMarker},
+    brain::PlayerActionSideEffect,
+    entity::{
+        motivator, Entity, EntityAttributes, EntityManager, EntityManagerMutation, EntityMarker,
+    },
     has_markers,
+    hex::AxialHex,
     player_gen::generate_player,
     Db,
 };
@@ -42,7 +43,7 @@ pub type TickId = usize;
 
 pub struct MatchManager {
     pub match_config: MatchConfig,
-    match_entities: EntityManager,
+    pub match_entities: EntityManager,
 }
 
 impl MatchManager {
@@ -92,6 +93,23 @@ impl MatchManager {
         // Put players in the desired locations
         // TODO
 
+        // Put 3 random lava entities in the world (not at the origin though)
+        let mut rng = rand::rng();
+        for i in 0..3 {
+            let position =
+                AxialHex::random_in_bounds(&mut rng, self.match_config.world_radius as isize);
+            self.match_entities.upsert_entity(Entity {
+                entity_id: Entity::id(),
+                name: format!("Lava Hazard {i}"),
+                markers: vec![EntityMarker::Hazard, EntityMarker::Viewable],
+                attributes: EntityAttributes {
+                    hex: Some(position),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })?;
+        }
+
         Ok(())
     }
 
@@ -126,9 +144,23 @@ impl MatchManager {
             // Player actions in this hex
             {
                 if let Some(entity) = players.choose(&mut rng) {
-                    let mut player = entity.clone();
-                    self.resolve_player_action(&mut player);
-                    self.match_entities.upsert_entity(player).unwrap();
+                    // Get a new copy to preserve changes from above
+                    // Skipping this step if they were removed
+                    let Some(mut player) = self.match_entities.get_entity(&entity.entity_id) else {
+                        continue;
+                    };
+
+                    // Go update it
+                    match self.resolve_player_action(&mut player) {
+                        Some(PlayerActionSideEffect::Death) => {
+                            self.match_entities
+                                .remove_entity(&player.entity_id)
+                                .unwrap();
+                        }
+                        None => {
+                            self.match_entities.upsert_entity(player).unwrap();
+                        }
+                    }
                 }
             }
         }
@@ -141,12 +173,23 @@ impl MatchManager {
     }
 
     fn resolve_world_effect_on_player(&self, player: &mut Entity) {
-        // TODO
+        // Is there a `hazard` entity at their hex?
+        if player.attributes.hex.is_some() {
+            if let Some(_hazard) = self
+                .match_entities
+                .get_all_entities()
+                .filter(|e| has_markers!(e, Hazard))
+                .find(|e| e.attributes.hex == player.attributes.hex)
+            {
+                // TODO: in future, could do scaling damage or whatever
+                player.attributes.motivators.bump::<motivator::Hurt>();
+            }
+        }
     }
 
-    fn resolve_player_action(&self, player: &mut Entity) {
+    fn resolve_player_action(&mut self, player: &mut Entity) -> Option<PlayerActionSideEffect> {
         let action = player.get_next_action();
-        player.resolve_action(action, &self.match_config);
+        player.resolve_action(action, &self.match_config)
     }
 }
 

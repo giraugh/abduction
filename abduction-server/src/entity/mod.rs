@@ -4,6 +4,7 @@ pub mod motivator;
 pub use manager::*;
 
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::{entity::motivator::MotivatorTable, hex::AxialHex};
 
@@ -19,6 +20,9 @@ pub enum EntityMarker {
 
     /// Whether the player escaped on the ship
     Escaped,
+
+    /// Something which hurts the players when interacted with
+    Hazard,
 }
 
 pub type EntityId = String; // TODO: use a uuid
@@ -62,7 +66,7 @@ pub enum RelationKind {
 
 /// A full entity including an id
 /// SEE ALSO: `EntityPayload`
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Default)]
 #[qubit::ts]
 pub struct Entity {
     /// The id of the entity
@@ -95,6 +99,12 @@ pub struct EntityPayload {
 
     /// Relations with other entities
     pub relations: Vec<(RelationKind, EntityId)>,
+}
+
+impl Entity {
+    pub fn id() -> EntityId {
+        Uuid::now_v7().hyphenated().to_string()
+    }
 }
 
 impl EntityPayload {

@@ -70,7 +70,7 @@ pub fn generate_player() -> anyhow::Result<Entity> {
 
     // Create the entity
     let player_entity = Entity {
-        entity_id: Uuid::now_v7().hyphenated().to_string(),
+        entity_id: Entity::id(),
         name: player_name,
         markers,
         relations,
@@ -165,7 +165,6 @@ mod test {
     fn test_random_line() {
         let names_path = PathBuf::from_str(FAMILY_NAMES_PATH).unwrap();
         let line = random_line_from_text_file(names_path);
-        dbg!(&line);
         assert!(line.is_ok());
         assert!(!line.unwrap().is_empty());
     }
