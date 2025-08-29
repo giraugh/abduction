@@ -137,9 +137,13 @@ impl Entity {
 
         // If the action was do nothing, get bored, otherwise get less bored
         match action {
+            // If we do nothing we get bored
             PlayerAction::Nothing => {
                 self.attributes.motivators.bump::<motivator::Boredom>();
             }
+            // If we just bark, thats like doing nothing...
+            PlayerAction::Bark(..) => {}
+            // But if we do *something* then reduce our boredom
             _ => {
                 self.attributes.motivators.reduce::<motivator::Boredom>();
             }

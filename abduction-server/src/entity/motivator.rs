@@ -24,7 +24,7 @@ impl MotivatorData {
     pub fn random() -> Self {
         Self {
             motivation: 0.0,
-            sensitivity: rng().random_range(0.05..=0.3),
+            sensitivity: rng().random_range(0.01..=0.1),
         }
     }
 }
@@ -49,10 +49,10 @@ impl MotivatorTable {
     }
 
     /// Decrement a motivator by the standard rate
-    /// for now they always go down by 0.2
+    /// for now they always go down by 0.05
     pub fn reduce<K: MotivatorTableKey>(&mut self) {
         let data = self.0.get_mut(&K::TABLE_KEY).unwrap();
-        data.motivation = (data.motivation - 0.2).clamp(0.0, 1.0);
+        data.motivation = (data.motivation - 0.05).clamp(0.0, 1.0);
     }
 }
 

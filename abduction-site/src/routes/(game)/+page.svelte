@@ -4,6 +4,7 @@
 	import { game } from '$lib/game.svelte';
 	import { capitalize, pluralize } from '@giraugh/tools';
 
+	// TODO: generic focus system which lets us also look at a given hex etc
 	let selectedEntity = $state<string | null>(null);
 
 	function axialToCompass(hex: [number, number]) {
@@ -26,6 +27,14 @@
 		if (markers.includes('player')) return '🤷‍♂️';
 		return '';
 	}
+
+	const logView = $derived.by(() => {
+		return game.logs.filter(
+			(l) =>
+				l.level === 'global' ||
+				(selectedEntity !== null && l.involved_entities.includes(selectedEntity))
+		);
+	});
 </script>
 
 <svelte:head>
@@ -84,6 +93,12 @@
 				{/if}
 			{/each}
 		</ul>
+		<ul class="logs">
+			{#each logView as log (log.id)}
+				<li class:global={log.level === 'global'}>{log.message}</li>
+			{/each}
+			<div id="log-anchor"></div>
+		</ul>
 
 		{#if selectedEntity !== null}
 			{@const entity = game.entities.get(selectedEntity)}
@@ -125,6 +140,42 @@
 		justify-content: center;
 		flex: 1;
 		align-self: stretch;
+	}
+
+	.logs {
+		max-height: 20em;
+		box-shadow: inset 0px 0px 6px 1px #111;
+		border-radius: 0.3em;
+
+		overflow-y: auto;
+
+		list-style-type: none;
+		margin: 0;
+		margin-block: 1em;
+		padding: 1em;
+
+		& * {
+			overflow-anchor: none;
+		}
+
+		& #log-anchor {
+			overflow-anchor: auto;
+			height: 1px;
+		}
+
+		& li {
+			padding-block: 0.1em;
+			font-size: 0.9rem;
+
+			&.global {
+				font-weight: bold;
+				padding-block: 1.5em;
+			}
+
+			&:not(.global) {
+				color: #888;
+			}
+		}
 	}
 
 	.attribute-table {

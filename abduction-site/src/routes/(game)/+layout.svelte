@@ -48,14 +48,7 @@
 		// Get logs
 		const unsubLogs = client.game_log_stream.subscribe({
 			on_data: (event) => {
-				const message = logMessage(event, game);
-				const level = logLevel(event);
-
-				if (level === 'global') {
-					console.log('%c' + message, 'font-weight: bold; color: cyan;');
-				} else {
-					console.log('%c' + message, 'color: grey;');
-				}
+				game.addLog(event);
 			},
 			on_error: () => {},
 			on_end: () => {}

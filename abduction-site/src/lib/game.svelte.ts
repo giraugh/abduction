@@ -1,8 +1,19 @@
-import type { Entity, MatchConfig, TickEvent } from '$lib/api.gen';
+import type { Entity, GameLog, MatchConfig, TickEvent } from '$lib/api.gen';
 import { SvelteMap } from 'svelte/reactivity';
+import { logLevel, logMessage, type GameLogLevel } from './logs';
+
+export const LOG_BUFFER_LIMIT = 1000;
+
+export type DecoratedLog = GameLog & { message: string; level: GameLogLevel; id: number };
 
 export class Game {
+	/** Map from entity ids to entity states -> only stores latest state */
 	entities: SvelteMap<string, Entity>;
+
+	/** Buffer storing last 1k logs or so. Does not contain all historical logs */
+	logs: Array<DecoratedLog>;
+	logCounter: number;
+
 	tickId: number;
 	config: MatchConfig | null;
 	loaded: boolean;
@@ -10,10 +21,23 @@ export class Game {
 
 	constructor() {
 		this.entities = new SvelteMap();
+		this.logs = $state([]);
+		this.logCounter = 0;
+
 		this.tickId = $state(0);
 		this.loaded = $state(false);
 		this.config = $state(null);
 		this.waitingForStart = $state(false);
+	}
+
+	addLog(log: GameLog) {
+		// TODO: limit the size of this buffer
+		this.logs.push({
+			...log,
+			message: logMessage(log, this) ?? '...',
+			level: logLevel(log),
+			id: this.logCounter++
+		});
 	}
 
 	processEvent(event: TickEvent) {
