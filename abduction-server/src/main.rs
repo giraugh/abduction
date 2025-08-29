@@ -1,6 +1,7 @@
 mod brain;
 mod entity;
 mod hex;
+mod logs;
 mod mtch;
 mod player_gen;
 
@@ -17,6 +18,7 @@ use tracing::{debug, info, level_filters::LevelFilter};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 use crate::entity::Entity;
+use crate::logs::GameLog;
 use crate::mtch::{MatchConfig, MatchManager, TickEvent};
 
 const TICK_DELAY: Duration = Duration::from_millis(100);
@@ -26,7 +28,13 @@ pub type Db = Pool<Sqlite>;
 /// The context type for qubit
 #[derive(Clone)]
 struct QubitCtx {
+    /// Sender for tick events
+    /// (This is lifecycle events and entity updates)
     tick_tx: broadcast::Sender<TickEvent>,
+
+    /// Sender for game logs
+    /// (This flavour and system events shown to users)
+    log_tx: broadcast::Sender<GameLog>,
 
     /// Db pool
     db: Db,
@@ -64,6 +72,14 @@ async fn events_stream(ctx: QubitCtx) -> impl Stream<Item = TickEvent> {
     stream.filter_map(|e| async { e.ok() })
 }
 
+/// Get a stream of game logs
+/// TODO: these should prob be saved to the DB too
+#[handler(subscription)]
+async fn game_log_stream(ctx: QubitCtx) -> impl Stream<Item = GameLog> {
+    let stream = tokio_stream::wrappers::BroadcastStream::new(ctx.log_tx.subscribe());
+    stream.filter_map(|e| async { e.ok() })
+}
+
 #[tokio::main]
 async fn main() {
     // Init tracing
@@ -80,6 +96,7 @@ async fn main() {
     let router = Router::new()
         .handler(get_entity_states)
         .handler(get_match_config)
+        .handler(game_log_stream)
         .handler(events_stream);
 
     // Generate ts types
@@ -108,10 +125,14 @@ async fn main() {
     // Create channel for tick events
     let (tick_tx, mut tick_rx) = broadcast::channel::<TickEvent>(10);
 
+    // Create channel for game logs
+    let (log_tx, mut log_rx) = broadcast::channel::<GameLog>(10);
+
     // Create a spot that could later be a match manager (youll see)
     let match_manager = Arc::default();
     let qubit_ctx = QubitCtx {
         tick_tx: tick_tx.clone(),
+        log_tx: log_tx.clone(),
         db: db.clone(),
         match_manager,
     };
@@ -132,6 +153,23 @@ async fn main() {
         let start_loop = async move {
             while let Ok(ev) = tick_rx.recv().await {
                 debug!("tick event {ev:?}");
+            }
+        };
+
+        async move {
+            tokio::select! {
+                () = start_loop => {},
+                () = token.cancelled() => {},
+            }
+        }
+    });
+
+    // Generate tracing logs for log events
+    tracker.spawn({
+        let token = token.clone();
+        let start_loop = async move {
+            while let Ok(ev) = log_rx.recv().await {
+                debug!("{ev:?}");
             }
         };
 
@@ -266,7 +304,7 @@ async fn tick_loop(ctx: QubitCtx) -> anyhow::Result<()> {
             .await
             .as_mut()
             .expect("Tick loop is running but match manager isnt present...")
-            .perform_match_tick(&ctx.tick_tx, &ctx.db)
+            .perform_match_tick(&ctx)
             .await;
 
         // Tell em we finished the tick

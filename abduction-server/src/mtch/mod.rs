@@ -16,7 +16,7 @@ pub mod config;
 pub use config::*;
 
 use itertools::Itertools;
-use rand::seq::IndexedRandom;
+use rand::{seq::IndexedRandom, Rng};
 use serde::Serialize;
 use tokio::sync::broadcast;
 use tracing::info;
@@ -28,8 +28,9 @@ use crate::{
     },
     has_markers,
     hex::AxialHex,
+    logs::{GameLog, GameLogBody},
     player_gen::generate_player,
-    Db,
+    Db, QubitCtx,
 };
 
 /// Id for a given match
@@ -119,7 +120,7 @@ impl MatchManager {
 
     /// Perform one game tick
     /// When a match is on, this is called every second or so to update the state of the world
-    pub async fn perform_match_tick(&mut self, tick_tx: &broadcast::Sender<TickEvent>, db: &Db) {
+    pub async fn perform_match_tick(&mut self, ctx: &QubitCtx) {
         // Lets just attempt to implement the main entity loop and see how we go I guess?
         // Rough plan is that each hex has one player action - the player who acted last acts now
         // This is encoded as the player with the highest `TicksWaited` attribute
@@ -136,7 +137,7 @@ impl MatchManager {
             {
                 if let Some(entity) = players.choose(&mut rng) {
                     let mut player = entity.clone();
-                    self.resolve_world_effect_on_player(&mut player);
+                    self.resolve_world_effect_on_player(&mut player, &ctx.log_tx);
                     self.match_entities.upsert_entity(player).unwrap();
                 }
             }
@@ -151,7 +152,7 @@ impl MatchManager {
                     };
 
                     // Go update it
-                    match self.resolve_player_action(&mut player) {
+                    match self.resolve_player_action(&mut player, &ctx.log_tx) {
                         Some(PlayerActionSideEffect::Death) => {
                             // Remove that player entity
                             self.match_entities
@@ -182,7 +183,7 @@ impl MatchManager {
 
         // Flush changes to entities to the DB and to clients
         self.match_entities
-            .flush_changes(tick_tx, db)
+            .flush_changes(&ctx.tick_tx, &ctx.db)
             .await
             .unwrap();
     }
@@ -197,10 +198,16 @@ impl MatchManager {
         player_count <= 1
     }
 
-    fn resolve_world_effect_on_player(&self, player: &mut Entity) {
+    fn resolve_world_effect_on_player(
+        &self,
+        player: &mut Entity,
+        log_tx: &broadcast::Sender<GameLog>,
+    ) {
+        let mut rng = rand::rng();
+
         // Is there a `hazard` entity at their hex?
-        if player.attributes.hex.is_some() {
-            if let Some(_hazard) = self
+        if player.attributes.hex.is_some() && rng.random_bool(0.7) {
+            if let Some(hazard) = self
                 .match_entities
                 .get_all_entities()
                 .filter(|e| has_markers!(e, Hazard))
@@ -208,13 +215,36 @@ impl MatchManager {
             {
                 // TODO: in future, could do scaling damage or whatever
                 player.attributes.motivators.bump::<motivator::Hurt>();
+                log_tx
+                    .send(GameLog::entity_pair(
+                        hazard,
+                        player,
+                        GameLogBody::HazardHurt,
+                    ))
+                    .unwrap();
+            }
+
+            return;
+        }
+
+        // Maybe they are just hungry/thirsty?
+        if rng.random_bool(0.01) {
+            // TODO: slowly tune this
+            if rng.random_bool(0.5) {
+                player.attributes.motivators.bump::<motivator::Hunger>();
+            } else {
+                player.attributes.motivators.bump::<motivator::Thirst>();
             }
         }
     }
 
-    fn resolve_player_action(&mut self, player: &mut Entity) -> Option<PlayerActionSideEffect> {
+    fn resolve_player_action(
+        &mut self,
+        player: &mut Entity,
+        log_tx: &broadcast::Sender<GameLog>,
+    ) -> Option<PlayerActionSideEffect> {
         let action = player.get_next_action();
-        player.resolve_action(action, &self.match_config)
+        player.resolve_action(action, &self.match_config, log_tx)
     }
 }
 

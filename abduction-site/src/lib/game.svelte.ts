@@ -1,7 +1,7 @@
 import type { Entity, MatchConfig, TickEvent } from '$lib/api.gen';
 import { SvelteMap } from 'svelte/reactivity';
 
-class Game {
+export class Game {
 	entities: SvelteMap<string, Entity>;
 	tickId: number;
 	config: MatchConfig | null;

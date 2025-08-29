@@ -3,6 +3,7 @@
 	import { get_api } from '$lib/api';
 	import type { TickEvent } from '$lib/api.gen';
 	import { game } from '$lib/game.svelte';
+	import { logLevel, logMessage } from '$lib/logs';
 
 	const { children } = $props();
 
@@ -30,7 +31,7 @@
 		});
 
 		// Begin events stream and start adding them into a buffer
-		const unsub = client.events_stream.subscribe({
+		const unsubEvents = client.events_stream.subscribe({
 			on_data: (event) => {
 				events.push(event);
 			},
@@ -44,7 +45,26 @@
 			}
 		});
 
-		return () => unsub();
+		// Get logs
+		const unsubLogs = client.game_log_stream.subscribe({
+			on_data: (event) => {
+				const message = logMessage(event, game);
+				const level = logLevel(event);
+
+				if (level === 'global') {
+					console.log('%c' + message, 'font-weight: bold; color: cyan;');
+				} else {
+					console.log('%c' + message, 'color: grey;');
+				}
+			},
+			on_error: () => {},
+			on_end: () => {}
+		});
+
+		return () => {
+			unsubEvents();
+			unsubLogs();
+		};
 	});
 
 	// Regularly check for events and apply them all to the current game state

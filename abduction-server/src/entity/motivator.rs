@@ -24,7 +24,7 @@ impl MotivatorData {
     pub fn random() -> Self {
         Self {
             motivation: 0.0,
-            sensitivity: rng().random_range(0.05..=0.5),
+            sensitivity: rng().random_range(0.05..=0.3),
         }
     }
 }
@@ -118,50 +118,71 @@ pub trait MotivatorBehaviour {
 
 impl MotivatorBehaviour for Hunger {
     fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
-        // If not hungry, dont vote for anything
-        // (this should prob be a breakpoint like 0.1 instead ig)
-        if motivation == 0.0 {
-            return Vec::new();
+        let mut actions = Vec::new();
+
+        if motivation > 0.5 {
+            actions.push((1, PlayerAction::Bark(motivation, MotivatorKey::Hunger)));
         }
 
-        todo!()
+        if motivation > 0.9 {
+            actions.push((1, PlayerAction::HungerPangs));
+        }
+
+        actions
     }
 }
 
 impl MotivatorBehaviour for Thirst {
     fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
-        // If not hungry, dont vote for anything
-        // (this should prob be a breakpoint like 0.1 instead ig)
-        if motivation == 0.0 {
-            return Vec::new();
+        let mut actions = Vec::new();
+
+        if motivation > 0.5 {
+            actions.push((1, PlayerAction::Bark(motivation, MotivatorKey::Thirst)));
         }
 
-        todo!()
+        if motivation > 0.8 {
+            actions.push((1, PlayerAction::ThirstPangs));
+        }
+
+        actions
     }
 }
 
 impl MotivatorBehaviour for Boredom {
     fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
-        // If bored enough, do a random movement
+        let mut actions = Vec::new();
+
         if motivation > 0.5 {
-            return PlayerAction::all_movements()
-                .iter()
-                .cloned()
-                .map(|action| (1, action))
-                .collect();
+            actions.push((1, PlayerAction::Bark(motivation, MotivatorKey::Boredom)));
         }
 
-        Vec::new()
+        // If bored enough, do a random movement
+        if motivation > 0.7 {
+            actions.extend(
+                PlayerAction::all_movements()
+                    .iter()
+                    .cloned()
+                    .map(|action| (3, action)),
+            );
+        }
+
+        actions
     }
 }
 
 impl MotivatorBehaviour for Hurt {
     fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
-        // If fully "motivated" then die
-        if motivation >= 0.99 {
-            return vec![(100, PlayerAction::Death)];
+        let mut actions = Vec::new();
+
+        if motivation > 0.5 {
+            actions.push((1, PlayerAction::Bark(motivation, MotivatorKey::Hurt)))
         }
 
-        Vec::new()
+        // If fully "motivated" then die
+        if motivation >= 0.99 {
+            actions.push((100, PlayerAction::Death));
+        }
+
+        actions
     }
 }

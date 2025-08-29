@@ -60,6 +60,8 @@ impl AxialHex {
 ///  - Pointy topped hexagons
 ///  - Odd rows are shunted right
 #[derive(Debug, Clone, Serialize, Copy)]
+#[qubit::ts]
+#[serde(rename_all = "snake_case")]
 pub enum AxialHexDirection {
     East,
     West,
