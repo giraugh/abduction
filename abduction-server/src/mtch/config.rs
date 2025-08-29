@@ -55,6 +55,13 @@ impl MatchConfig {
             .context("getting match config")
     }
 
+    pub async fn get_incomplete(db: &Db) -> anyhow::Result<Option<Self>> {
+        sqlx::query_file_as!(Self, "queries/get_incomplete_match_config.sql")
+            .fetch_optional(db)
+            .await
+            .context("getting unfinished match config")
+    }
+
     pub async fn save(&self, db: &Db) -> anyhow::Result<()> {
         info!("Saving match configuration {} to db", &self.match_id);
         sqlx::query_file_as!(

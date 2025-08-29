@@ -231,6 +231,7 @@ impl EntityManager {
         for mutation in pending_mutations {
             let mutation = EntityMutation::from_entity_manager_mutation(&self.match_id, mutation);
             let payload = Json(mutation.payload);
+
             sqlx::query_file!(
                 "queries/add_match_mutation.sql",
                 mutation.entity_id,

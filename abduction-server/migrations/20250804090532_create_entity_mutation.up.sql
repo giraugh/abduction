@@ -17,7 +17,11 @@ CREATE TABLE entity_mutation (
     payload JSONB,
 
     -- Created at
-    timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    -- Link to match config
+    FOREIGN KEY (match_id) REFERENCES match_config(match_id)
 );
 
--- TODO FOREIGN KEY ON MATCH CONFIG
+-- CREATE AN INDEX FOR THE MUTATIONS IN A GIVEN MATCH
+CREATE INDEX entity_mutation_match ON entity_mutation(match_id);
