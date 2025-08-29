@@ -19,9 +19,13 @@
 		client.get_entity_states.query().then((states) => {
 			if (states) {
 				game.loaded = true;
+				game.waitingForStart = false;
 				for (const entity of states) {
 					game.entities.set(entity.entity_id, entity);
 				}
+			} else {
+				// TODO: hmm, should prob just go somewhere to poll
+				game.waitingForStart = true;
 			}
 		});
 
@@ -47,7 +51,8 @@
 	$effect(() => {
 		const interval = setInterval(() => {
 			// If stream is not initialised, just queue up events
-			if (!game.loaded) return;
+			// (If we didnt load because no match on, do process events because we are listening for a match start event)
+			if (!game.loaded && !game.waitingForStart) return;
 
 			// Process all available events
 			while (events.length > 0) {
@@ -67,6 +72,8 @@
 	<main>
 		{#if game.loaded}
 			{@render children()}
+		{:else if game.waitingForStart}
+			No match currently running. Match will start soon...
 		{:else}
 			Loading...
 		{/if}

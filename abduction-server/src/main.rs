@@ -219,7 +219,7 @@ async fn run_match_now(ctx: QubitCtx) -> anyhow::Result<()> {
 
             // Okay cool, create a new match
             info!("Creating a new match");
-            let dev_match = MatchConfig::isolated(3, 4);
+            let dev_match = MatchConfig::isolated(15, 10);
             dev_match
                 .save(&ctx.db)
                 .await
