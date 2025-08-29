@@ -1,20 +1,31 @@
+import { goto, invalidateAll } from '$app/navigation';
 import type { Entity, MatchConfig, TickEvent } from '$lib/api.gen';
 import { SvelteMap } from 'svelte/reactivity';
 
 class Game {
 	entities: SvelteMap<string, Entity>;
 	tickId: number;
-	loaded: boolean;
 	config: MatchConfig | null;
+	loaded: boolean;
+	finished: boolean;
 
 	constructor() {
 		this.entities = new SvelteMap();
 		this.tickId = $state(0);
 		this.loaded = $state(false);
 		this.config = $state(null);
+		this.finished = $state(false);
 	}
 
 	processEvent(event: TickEvent) {
+		if (event.kind === 'start_of_match') {
+			// For now, just reload the page, as we need to do a full reset anyway
+			location.reload();
+		} else if (this.finished) {
+			// Once the match is finished, ignore any more events
+			return;
+		}
+
 		if (event?.kind === 'entity_changes') {
 			for (const change of event.changes) {
 				if (change.kind === 'set_entity') {
@@ -31,6 +42,11 @@ class Game {
 
 		if (event?.kind === 'start_of_tick') {
 			this.tickId = event.tick_id;
+		}
+
+		if (event?.kind === 'end_of_match') {
+			console.log('End of match');
+			this.finished = true;
 		}
 	}
 }

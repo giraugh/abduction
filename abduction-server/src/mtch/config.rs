@@ -22,6 +22,9 @@ pub struct MatchConfig {
     /// TODO: I really want this to be unsigned...
     pub player_count: i32,
 
+    /// Is the match complete?
+    pub complete: bool,
+
     /// Optionally, the id of the match preceding
     /// this one. If set, players and some entities may be copied across
     /// #[sqlx(try_from = "Option<String>")]
@@ -39,6 +42,7 @@ impl MatchConfig {
             player_count: player_count as i32,
             preceding_match_id: preceding_player_id,
             world_radius: world_radius as i32,
+            complete: false,
         }
     }
 
@@ -70,7 +74,8 @@ impl MatchConfig {
             self.match_id,
             self.player_count,
             self.preceding_match_id,
-            self.world_radius
+            self.world_radius,
+            self.complete,
         )
         .execute(db)
         .await

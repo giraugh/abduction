@@ -187,6 +187,16 @@ impl MatchManager {
             .unwrap();
     }
 
+    /// is the match over? True if there is 0-1 players left
+    pub fn match_over(&self) -> bool {
+        let player_count = self
+            .match_entities
+            .get_all_entities()
+            .filter(|e| has_markers!(e, Player))
+            .count();
+        player_count <= 1
+    }
+
     fn resolve_world_effect_on_player(&self, player: &mut Entity) {
         // Is there a `hazard` entity at their hex?
         if player.attributes.hex.is_some() {
@@ -226,6 +236,13 @@ pub enum TickEvent {
 
     /// A new tick has ended
     EndOfTick { tick_id: TickId },
+
+    /// A new match just started
+    /// (note: does not fire if resumed, only when completely new)
+    StartOfMatch,
+
+    /// The match ended
+    EndOfMatch,
 
     /// Set of changes to entities during the last tick
     EntityChanges { changes: Vec<EntityManagerMutation> },

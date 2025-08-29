@@ -9,7 +9,7 @@ use qubit::{handler, Router};
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool};
 use std::{env, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::sync::broadcast;
-use tokio::time::Duration;
+use tokio::time::{sleep, Duration};
 use tokio::{net::TcpListener, sync::Mutex};
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
@@ -19,7 +19,7 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use crate::entity::Entity;
 use crate::mtch::{MatchConfig, MatchManager, TickEvent};
 
-const TICK_DELAY: Duration = Duration::from_millis(500);
+const TICK_DELAY: Duration = Duration::from_millis(100);
 
 pub type Db = Pool<Sqlite>;
 
@@ -171,13 +171,17 @@ async fn main() {
     // and/or load the schedule for the next one
     tracker.spawn({
         let token = token.clone();
-        let start_match_runner = run_match_now(qubit_ctx.clone());
+        let start_match_runner = async move {
+            loop {
+                // Run the match...
+                // if it returns its because the match ended, if so just loop it back
+                run_match_now(qubit_ctx.clone()).await.unwrap();
+            }
+        };
 
         async move {
             tokio::select! {
-                err = start_match_runner => {
-                    err.unwrap();
-                },
+                () = start_match_runner => {},
                 () = token.cancelled() => {},
             }
         }
@@ -210,9 +214,12 @@ async fn run_match_now(ctx: QubitCtx) -> anyhow::Result<()> {
             // info!("Checking match schedule");
             // TODO
 
+            // TODO: actually check schedule but for now just wait 5 secs
+            sleep(Duration::from_secs(5)).await;
+
             // Okay cool, create a new match
             info!("Creating a new match");
-            let dev_match = MatchConfig::isolated(100, 25);
+            let dev_match = MatchConfig::isolated(3, 4);
             dev_match
                 .save(&ctx.db)
                 .await
@@ -225,6 +232,10 @@ async fn run_match_now(ctx: QubitCtx) -> anyhow::Result<()> {
                 .initialise_new_match(&ctx.db)
                 .await
                 .expect("Failed to initialise match");
+
+            // Fire off a "new match started" event
+            ctx.tick_tx.send(TickEvent::StartOfMatch)?;
+
             match_manager
         }
     };
@@ -249,12 +260,14 @@ async fn tick_loop(ctx: QubitCtx) -> anyhow::Result<()> {
             })
             .expect("Cannot send start of tick event");
 
-        // Run the next tick
-        {
-            if let Some(mm) = ctx.match_manager.lock().await.as_mut() {
-                mm.perform_match_tick(&ctx.tick_tx, &ctx.db).await;
-            }
-        }
+        // Generate updates for this tick
+        ctx.match_manager
+            .lock()
+            .await
+            .as_mut()
+            .expect("Tick loop is running but match manager isnt present...")
+            .perform_match_tick(&ctx.tick_tx, &ctx.db)
+            .await;
 
         // Tell em we finished the tick
         ctx.tick_tx
@@ -263,8 +276,34 @@ async fn tick_loop(ctx: QubitCtx) -> anyhow::Result<()> {
             })
             .expect("Cannot send end of tick event");
 
+        // Did the match just finish?
+        {
+            let mut maybe_mm = ctx.match_manager.lock().await;
+            let mm = maybe_mm
+                .as_mut()
+                .expect("Tick loop is running but match_manager isn't present...");
+            if mm.match_over() {
+                info!("Match completed");
+
+                // Update the config to set `complete=true`
+                mm.match_config.complete = true;
+                mm.match_config.save(&ctx.db).await?;
+
+                // Send an event
+                ctx.tick_tx.send(TickEvent::EndOfMatch)?;
+
+                // Remove the shared manager
+                *maybe_mm = None;
+
+                // Break the loop
+                break;
+            }
+        }
+
         // Wait for next tick...
         tick_count += 1;
         tokio::time::sleep(TICK_DELAY).await;
     }
+
+    Ok(())
 }

@@ -17,9 +17,11 @@
 
 		// Get the current state of all entities
 		client.get_entity_states.query().then((states) => {
-			game.loaded = true;
-			for (const entity of states) {
-				game.entities.set(entity.entity_id, entity);
+			if (states) {
+				game.loaded = true;
+				for (const entity of states) {
+					game.entities.set(entity.entity_id, entity);
+				}
 			}
 		});
 
