@@ -96,7 +96,7 @@ async fn main() {
     // #NOTE: #HACK: during dev, we just create a new isolated match each time
     //               we restart
     info!("Creating new match config for development");
-    let dev_match = MatchConfig::isolated(30, 5);
+    let dev_match = MatchConfig::isolated(100, 25);
     dev_match
         .save(&db)
         .await

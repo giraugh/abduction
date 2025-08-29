@@ -65,6 +65,8 @@
 	<main>
 		{#if game.loaded}
 			{@render children()}
+		{:else}
+			Loading...
 		{/if}
 	</main>
 </div>
