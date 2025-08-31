@@ -1,0 +1,24 @@
+services:
+  abduction-site:
+    restart: on-failure
+    build: ./abduction-site
+    hostname: abduction-site
+    networks:
+      - abduction-net
+    ports:
+      - '3000:3000'
+  abduction-server:
+    restart: on-failure
+    build: ./abduction-server
+    hostname: abduction-server
+    environment:
+      DATABASE_URL: "sqlite:///data/db.sqlite?mode=rwc"
+    volumes:
+      - ./abduction-server/data:/data
+    ports:
+      - '9944:9944'
+    networks:
+      - abduction-net
+
+networks:
+  abduction-net:

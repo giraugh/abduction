@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT\n    match_id,\n    player_count as \"player_count: i32\",\n    preceding_match_id,\n    world_radius as \"world_radius: i32\",\n    complete\nFROM\n    match_config\nWHERE\n    match_id = ?\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "match_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "player_count: i32",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "preceding_match_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "world_radius: i32",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "complete",
+        "ordinal": 4,
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "f62f4b3d5ab33106efbd63abeb4e5235b34d9adcbb371b9c895d04efdce74bfc"
+}

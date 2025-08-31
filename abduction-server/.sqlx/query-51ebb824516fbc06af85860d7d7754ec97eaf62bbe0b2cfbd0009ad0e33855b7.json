@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO match_config(\n    match_id,\n    player_count,\n    preceding_match_id,\n    world_radius,\n    complete\n)\nVALUES (?, ?, ?, ?, ?)\nON CONFLICT (\"match_id\")\nDO UPDATE\nSET\n    player_count       = EXCLUDED.player_count,\n    preceding_match_id = EXCLUDED.preceding_match_id,\n    world_radius       = EXCLUDED.world_radius,\n    complete           = EXCLUDED.complete;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "51ebb824516fbc06af85860d7d7754ec97eaf62bbe0b2cfbd0009ad0e33855b7"
+}

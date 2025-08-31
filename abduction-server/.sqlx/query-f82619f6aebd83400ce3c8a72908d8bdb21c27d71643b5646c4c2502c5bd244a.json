@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "WITH match_mutations AS (\n    SELECT * from entity_mutation WHERE match_id = ?\n),\nlatest_mutations AS (\n    SELECT\n        entity_id,\n        payload,\n        mutation_type,\n        ROW_NUMBER() OVER (PARTITION BY entity_id ORDER BY mutation_id DESC) AS row_num\n    FROM\n        match_mutations\n)\nSELECT\n    entity_id,\n    payload as \"entity: Json<EntityPayload>\"\nFROM\n    latest_mutations\nWHERE\n    row_num = 1\n    AND mutation_type = 'S';\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "entity_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "entity: Json<EntityPayload>",
+        "ordinal": 1,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "f82619f6aebd83400ce3c8a72908d8bdb21c27d71643b5646c4c2502c5bd244a"
+}

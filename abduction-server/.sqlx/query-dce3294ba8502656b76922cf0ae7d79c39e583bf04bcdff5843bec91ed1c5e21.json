@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO entity_mutation(\n    \"entity_id\",\n    \"match_id\",\n    \"mutation_type\",\n    \"payload\"\n) VALUES (\n    ?,\n    ?,\n    ?,\n    ?\n);\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "dce3294ba8502656b76922cf0ae7d79c39e583bf04bcdff5843bec91ed1c5e21"
+}

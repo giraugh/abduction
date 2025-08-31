@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "WITH latest_match as (\n    SELECT * FROM match_config\n    ORDER BY created_at DESC\n    LIMIT 1\n)\nSELECT match_id,\n    player_count as \"player_count: i32\",\n    preceding_match_id,\n    world_radius as \"world_radius: i32\",\n    complete\nFROM latest_match WHERE complete = false\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "match_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "player_count: i32",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "preceding_match_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "world_radius: i32",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "complete",
+        "ordinal": 4,
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "b97e3450334db54bbfb23d10612dbfa71138fcd14d8da967f14408c34c403d58"
+}

@@ -9,12 +9,13 @@ use futures::{Stream, StreamExt};
 use qubit::{handler, Router};
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool};
 use std::{env, net::SocketAddr, str::FromStr, sync::Arc};
+use tokio::fs;
 use tokio::sync::broadcast;
 use tokio::time::{sleep, Duration};
 use tokio::{net::TcpListener, sync::Mutex};
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
-use tracing::{debug, info, level_filters::LevelFilter};
+use tracing::{debug, info, level_filters::LevelFilter, warn};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 use crate::entity::Entity;
@@ -100,10 +101,14 @@ async fn main() {
         .handler(events_stream);
 
     // Generate ts types
-    info!("Writing ts bindings");
-    router
-        .generate_type("../abduction-site/src/lib/api.gen.ts")
-        .expect("Failed to write bindings");
+    if fs::try_exists("../abduction-site").await.unwrap() {
+        info!("Writing ts bindings");
+        router
+            .generate_type("../abduction-site/src/lib/api.gen.ts")
+            .expect("Failed to write bindings");
+    } else {
+        warn!("Skipping writing ts bindings");
+    }
 
     // Setup db connection
     let db_conn_string = env::var("DATABASE_URL")
@@ -185,9 +190,9 @@ async fn main() {
     tracker.spawn({
         let token = token.clone();
 
-        info!("RPC server listening at 127.0.0.1:9944");
+        info!("RPC server listening at 0.0.0.0:9944");
         let start_hyper = axum::serve(
-            TcpListener::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
+            TcpListener::bind(&SocketAddr::from(([0, 0, 0, 0], 9944)))
                 .await
                 .unwrap(),
             axum_router,

@@ -1,7 +1,0 @@
-services:
-  abduction-site:
-    restart: on-failure
-    build: ./abduction-site
-    hostname: abduction-site
-    ports:
-      - '81:3000'
