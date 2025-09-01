@@ -36,19 +36,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v2
 
-      - name: Build&Push Site
+      - name: Build and Push Site
         uses: VaultVulp/gp-docker-action@1.6.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           image-name: abduction-site
           build-context: ./abduction-site
-
-      - name: Build and Push
-        uses: VaultVulp/gp-docker-action@1.6.0
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          image-name: abduction-server
-          build-context: ./abduction-server
 
   deploy:
     needs:
