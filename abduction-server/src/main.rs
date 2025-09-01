@@ -22,7 +22,8 @@ use crate::entity::Entity;
 use crate::logs::GameLog;
 use crate::mtch::{MatchConfig, MatchManager, TickEvent};
 
-const TICK_DELAY: Duration = Duration::from_millis(100);
+const TICK_DELAY: Duration = Duration::from_millis(500);
+const MATCH_COOLDOWN_DURATION: Duration = Duration::from_secs(1_200); // 20mins
 
 pub type Db = Pool<Sqlite>;
 
@@ -257,8 +258,8 @@ async fn run_match_now(ctx: QubitCtx) -> anyhow::Result<()> {
             // info!("Checking match schedule");
             // TODO
 
-            // TODO: actually check schedule but for now just wait 5 secs
-            sleep(Duration::from_secs(5)).await;
+            // TODO: actually check schedule but for now just wait for a delay
+            sleep(MATCH_COOLDOWN_DURATION).await;
 
             // Okay cool, create a new match
             info!("Creating a new match");
