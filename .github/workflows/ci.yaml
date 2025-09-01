@@ -7,10 +7,20 @@ on:
 
 jobs:
   build-server:
+    permissions: write-all
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
+
+      - name: Cache Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
 
       - name: Build and Push
         uses: VaultVulp/gp-docker-action@1.6.0
@@ -21,6 +31,7 @@ jobs:
 
   build-site:
     runs-on: ubuntu-latest
+    permissions: write-all
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
