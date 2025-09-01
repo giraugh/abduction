@@ -295,6 +295,7 @@ async fn run_match_now(ctx: QubitCtx) -> anyhow::Result<()> {
 
 async fn tick_loop(ctx: QubitCtx) -> anyhow::Result<()> {
     // Start the tick loop
+    info!("Starting main tick loop");
     let mut tick_count = 0;
     loop {
         ctx.tick_tx

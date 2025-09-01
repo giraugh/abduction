@@ -13,6 +13,7 @@
 /// - The match will then be scheduled but not run until the Monday.
 /// - Add queries and UI such that players can see the next upcoming match.
 pub mod config;
+use anyhow::Context;
 pub use config::*;
 
 use itertools::Itertools;
@@ -87,7 +88,7 @@ impl MatchManager {
         // then generate and add more
         let player_count_to_gen = self.match_config.player_count - existing_players;
         for _ in 0..player_count_to_gen {
-            let player_entity = generate_player()?;
+            let player_entity = generate_player().context("Generating player entity")?;
             self.match_entities.upsert_entity(player_entity)?;
         }
 
