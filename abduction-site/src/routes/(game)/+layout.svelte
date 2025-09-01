@@ -3,7 +3,6 @@
 	import { get_api } from '$lib/api';
 	import type { TickEvent } from '$lib/api.gen';
 	import { game } from '$lib/game.svelte';
-	import { logLevel, logMessage } from '$lib/logs';
 
 	const { children } = $props();
 

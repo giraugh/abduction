@@ -143,7 +143,7 @@
 	}
 
 	.logs {
-		max-height: 20em;
+		height: 15em;
 		box-shadow: inset 0px 0px 6px 1px #111;
 		border-radius: 0.3em;
 
@@ -212,6 +212,7 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.2em;
+		font-size: 0.7rem;
 
 		& button {
 			font-weight: normal;
@@ -240,5 +241,22 @@
 		align-self: stretch;
 		padding: 1em;
 		flex: 1;
+		min-width: 300px;
+
+		& h2:first-of-type {
+			margin-top: 0;
+		}
+	}
+
+	@media (max-width: 700px) {
+		.wrapper {
+			display: flex;
+			flex-direction: column;
+		}
+
+		.svg-container {
+			flex: 1;
+			width: 100%;
+		}
 	}
 </style>
