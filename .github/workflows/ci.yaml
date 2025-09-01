@@ -1,0 +1,63 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Build and Push
+        uses: VaultVulp/gp-docker-action@1.6.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          image-name: abduction-server
+          build-context: ./abduction-server
+
+  build-site:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Build&Push Site
+        uses: VaultVulp/gp-docker-action@1.6.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          image-name: abduction-site
+          build-context: ./abduction-site
+
+      - name: Build and Push
+        uses: VaultVulp/gp-docker-action@1.6.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          image-name: abduction-server
+          build-context: ./abduction-server
+
+  deploy:
+    needs:
+      - build-server
+      - build-site
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.INSTANCE_HOST }}
+          username: ${{ vars.INSTANCE_SSH_USERNAME }}
+          key: ${{ secrets.INSTANCE_SSH_KEY }}
+          script: |
+            cd ~
+            docker-compose down
+            docker-compose pull
+            docker-compose up -d
+
