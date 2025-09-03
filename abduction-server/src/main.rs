@@ -1,6 +1,7 @@
 mod brain;
 mod entity;
 mod hex;
+mod location;
 mod logs;
 mod mtch;
 mod player_gen;

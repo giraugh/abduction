@@ -107,11 +107,6 @@ macro_rules! declare_motivators {
 
 declare_motivators!({ Hunger, Thirst, Boredom, Hurt });
 
-// TODO:
-//  - there's a world here where a motivator actually wants to emit a list of actions for each weight like
-//    suppose you're hungry, I might create a set of actions like (EatFood, FindFood) that will eat food if we have it or otherwise find food
-//    but I guess that could be encoded as a EatOrFindFood action... yeah...
-
 pub trait MotivatorBehaviour {
     fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)>;
 }

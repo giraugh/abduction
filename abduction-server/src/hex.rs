@@ -30,6 +30,32 @@ impl AxialHex {
     pub const SOUTH_EAST: AxialHex = AxialHex(0, 1);
     pub const SOUTH_WEST: AxialHex = AxialHex(-1, 1);
 
+    pub fn all_in_bounds(radius: isize) -> Vec<Self> {
+        let mut result = Vec::new();
+        for q in -radius..=radius {
+            for r in -radius..=radius {
+                let s = -q - r;
+                if q.abs().max(r.abs()).max(s.abs()) <= radius {
+                    result.push(Self(q, r));
+                }
+            }
+        }
+        result
+    }
+
+    /// Return all neighbouring hexes
+    pub fn neighbours(&self) -> [AxialHex; 6] {
+        let AxialHex(q, r) = *self;
+        [
+            AxialHex(q + 1, r),
+            AxialHex(q + 1, r - 1),
+            AxialHex(q, r - 1),
+            AxialHex(q - 1, r),
+            AxialHex(q - 1, r + 1),
+            AxialHex(q, r + 1),
+        ]
+    }
+
     pub fn random_in_bounds(rng: &mut impl Rng, radius: isize) -> Self {
         let x = (rng.random_range(0..=2 * (radius as usize)) as isize) - radius;
         let min_y = isize::max(-radius, -x - radius);

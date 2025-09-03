@@ -13,6 +13,8 @@
 /// - The match will then be scheduled but not run until the Monday.
 /// - Add queries and UI such that players can see the next upcoming match.
 pub mod config;
+use std::collections::HashMap;
+
 use anyhow::Context;
 pub use config::*;
 
@@ -29,6 +31,7 @@ use crate::{
     },
     has_markers,
     hex::AxialHex,
+    location::{generate_locations_for_world, Biome},
     logs::{GameLog, GameLogBody},
     player_gen::generate_player,
     Db, QubitCtx,
@@ -64,9 +67,6 @@ impl MatchManager {
     ///
     /// This should only be done once per match, realistically - so prob do it when
     /// the config is created
-    ///
-    /// NOTE: This can be done before the match is ready to be run
-    ///       i.e right after the previous match if appropriate.
     pub async fn initialise_new_match(&mut self, db: &Db) -> anyhow::Result<()> {
         // Now we initialise it...
         info!("Initialising match {}", &self.match_config.match_id);
@@ -90,6 +90,13 @@ impl MatchManager {
         for _ in 0..player_count_to_gen {
             let player_entity = generate_player().context("Generating player entity")?;
             self.match_entities.upsert_entity(player_entity)?;
+        }
+
+        // Generate a location entity in each hex
+        for entity in
+            generate_locations_for_world(self.match_config.world_radius as isize, Biome::Green)
+        {
+            self.match_entities.upsert_entity(entity)?;
         }
 
         // Put players in the desired locations
