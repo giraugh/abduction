@@ -10,7 +10,22 @@ Websocket Death
 - Backport this to qubit
 
 Environment Generation
+- Each match has a biome
+- biome informs possible locations
+- each hex has a location
+- locations inform pre-match entity gen (props)
+- locations may have other effects (e.g can be a hazard)
 
+Graphics
+- Clean up the way the map is displayed
+- We want entities to be rendered not as full hexagons, but as dots or something in each hex
+
+Migration Safety
+- When we make certain changes, I want to update some kind of version tag and then force a new game to be deployed when the CI build runs
+- this could quite literally use the rust version and put something in the db
+
+Dev/Prod DX
+- Can I get some kind of cfg attribute for local dev only?
 
 Scheduling games
   - Detect when a game is finished (one player remains)

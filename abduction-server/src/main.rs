@@ -24,8 +24,7 @@ use crate::logs::GameLog;
 use crate::mtch::{MatchConfig, MatchManager, TickEvent};
 
 const TICK_DELAY: Duration = Duration::from_millis(500);
-// const MATCH_COOLDOWN_DURATION: Duration = Duration::from_secs(1_200); // 20mins
-const MATCH_COOLDOWN_DURATION: Duration = Duration::from_secs(1); // 20mins
+const MATCH_COOLDOWN_DURATION: Duration = Duration::from_secs(1_200); // 20mins
 
 pub type Db = Pool<Sqlite>;
 
