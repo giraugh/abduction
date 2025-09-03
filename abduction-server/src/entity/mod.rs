@@ -8,6 +8,10 @@ use uuid::Uuid;
 
 use crate::{entity::motivator::MotivatorTable, hex::AxialHex, location::LocationKind};
 
+/// These are sort of tags that can be associated with an entity
+///
+/// NOTE: When using these, make sure they dont represent something that may also need data on the entity in the future
+///       so for example, a corpse isn't a marker because I also need to store the other entity that died
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[qubit::ts]

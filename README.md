@@ -24,9 +24,6 @@ Migration Safety
 - When we make certain changes, I want to update some kind of version tag and then force a new game to be deployed when the CI build runs
 - this could quite literally use the rust version and put something in the db
 
-Dev/Prod DX
-- Can I get some kind of cfg attribute for local dev only?
-
 Scheduling games
   - Detect when a game is finished (one player remains)
   - Stop that game (emit MatchEnd TickEvent), and somehow schedule the next one

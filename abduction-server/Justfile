@@ -5,7 +5,7 @@ default:
 
 # Run `cargo watch`, which will restart the application automatically as files change.
 dev:
-    cargo watch -c -x run -i data
+    cargo watch -c -x run -i data --features dev
 
 run:
     cargo run
