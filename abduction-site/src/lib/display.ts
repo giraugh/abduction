@@ -37,9 +37,6 @@ export function axialHexRange(radius: number): [number, number][] {
 }
 
 export function entityColor(entity: Entity) {
-	// is it not a player?
-	if (!entity.markers.includes('player')) return 'grey';
-
 	// Otherwise get the hue
 	const hue = entity.attributes.display_color_hue;
 	if (!hue) return 'grey';

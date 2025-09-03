@@ -6,26 +6,22 @@ pub use manager::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{entity::motivator::MotivatorTable, hex::AxialHex};
+use crate::{entity::motivator::MotivatorTable, hex::AxialHex, location::LocationKind};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[qubit::ts]
 pub enum EntityMarker {
     /// Whether this represents a player agent
+    /// Maybe remove this later
     Player,
 
-    /// Whether this can be viewed in the client
+    /// Whether this can be viewed in the inspector
     Viewable,
 
     /// Whether the player escaped on the ship
+    /// Maybe remove this later
     Escaped,
-
-    /// The corpse of a player
-    Corpse,
-
-    /// Something which hurts the players when interacted with
-    Hazard,
 }
 
 pub type EntityId = String; // TODO: use a uuid
@@ -48,10 +44,32 @@ pub struct EntityAttributes {
     /// Which hex the entity is located in if applicable
     pub hex: Option<AxialHex>,
 
+    /// If set, this entity is a corpse of some previous entity
+    pub corpse: Option<EntityId>,
+
+    /// If set, this entity is a hazard which can deal damage when interacted with
+    pub hazard: Option<EntityHazard>,
+
+    /// If set, this entity represents a location with the given location kind
+    pub location: Option<EntityLocation>,
+
     /// A primary hue to use when displaying this entity
     /// The value is a % out of 100 for use in HSL
     /// (e.g for player dots)
     pub display_color_hue: Option<f32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[qubit::ts]
+pub struct EntityHazard {
+    /// Damage dealt by this hazard, measures in bumps to a hurt motivator
+    pub damage: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[qubit::ts]
+pub struct EntityLocation {
+    pub location_kind: LocationKind,
 }
 
 /// A type of entity relation

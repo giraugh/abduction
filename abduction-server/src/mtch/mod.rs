@@ -13,7 +13,6 @@
 /// - The match will then be scheduled but not run until the Monday.
 /// - Add queries and UI such that players can see the next upcoming match.
 pub mod config;
-use std::collections::HashMap;
 
 use anyhow::Context;
 pub use config::*;
@@ -27,7 +26,8 @@ use tracing::info;
 use crate::{
     brain::PlayerActionSideEffect,
     entity::{
-        motivator, Entity, EntityAttributes, EntityManager, EntityManagerMutation, EntityMarker,
+        motivator, Entity, EntityAttributes, EntityHazard, EntityManager, EntityManagerMutation,
+        EntityMarker,
     },
     has_markers,
     hex::AxialHex,
@@ -110,9 +110,10 @@ impl MatchManager {
             self.match_entities.upsert_entity(Entity {
                 entity_id: Entity::id(),
                 name: format!("Lava Hazard {i}"),
-                markers: vec![EntityMarker::Hazard, EntityMarker::Viewable],
+                markers: vec![EntityMarker::Viewable],
                 attributes: EntityAttributes {
                     hex: Some(position),
+                    hazard: Some(EntityHazard { damage: 1 }),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -171,10 +172,11 @@ impl MatchManager {
                             self.match_entities
                                 .upsert_entity(Entity {
                                     entity_id: Entity::id(),
-                                    markers: vec![EntityMarker::Viewable, EntityMarker::Corpse],
+                                    markers: vec![EntityMarker::Viewable],
                                     name: format!("Corpse of {}", &player.name),
                                     attributes: EntityAttributes {
                                         hex: player.attributes.hex,
+                                        corpse: Some(player.entity_id),
                                         ..Default::default()
                                     },
                                     ..Default::default()
@@ -215,21 +217,25 @@ impl MatchManager {
 
         // Is there a `hazard` entity at their hex?
         if player.attributes.hex.is_some() && rng.random_bool(0.7) {
-            if let Some(hazard) = self
+            for entity in self
                 .match_entities
                 .get_all_entities()
-                .filter(|e| has_markers!(e, Hazard))
-                .find(|e| e.attributes.hex == player.attributes.hex)
+                .filter(|e| e.attributes.hex == player.attributes.hex)
             {
-                // TODO: in future, could do scaling damage or whatever
-                player.attributes.motivators.bump::<motivator::Hurt>();
-                log_tx
-                    .send(GameLog::entity_pair(
-                        hazard,
-                        player,
-                        GameLogBody::HazardHurt,
-                    ))
-                    .unwrap();
+                if let Some(hazard) = &entity.attributes.hazard {
+                    for _ in 0..hazard.damage {
+                        player.attributes.motivators.bump::<motivator::Hurt>();
+                    }
+
+                    log_tx
+                        .send(GameLog::entity_pair(
+                            entity,
+                            player,
+                            GameLogBody::HazardHurt,
+                        ))
+                        .unwrap();
+                    break;
+                }
             }
 
             return;

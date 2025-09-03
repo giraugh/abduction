@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { EntityMarker, MotivatorKey } from '$lib/api.gen';
+	import type { Entity, MotivatorKey } from '$lib/api.gen';
 	import { axialHexRange, axialToPixel, entityColor, HEX_SIZE, hexagonPoints } from '$lib/display';
 	import { game } from '$lib/game.svelte';
 	import { capitalize, pluralize } from '@giraugh/tools';
@@ -21,10 +21,12 @@
 		Array.from(game.entities.values()).filter((e) => e.markers.includes('player')).length
 	);
 
-	function emojiFromMarkers(markers: EntityMarker[]) {
-		if (markers.includes('corpse')) return '💀';
-		if (markers.includes('hazard')) return '🔥';
-		if (markers.includes('player')) return '🤷‍♂️';
+	function entityEmoji(entity: Entity) {
+		if (entity.markers.includes('player')) return '🤷‍♂️';
+		if (entity.attributes.corpse) return '💀';
+		if (entity.attributes.hazard) return '🔥';
+		if (entity.attributes.location) return '📍';
+
 		return '';
 	}
 
@@ -49,21 +51,15 @@
 				<polygon {points} fill="#555" />
 			{/each}
 
-			{#each game.entities as [entityId, entity] (entityId)}
-				{@const selected = entityId === selectedEntity}
-				{@const position = entity.attributes.hex}
-				{#if position !== null}
-					<!-- Right now we are rendering entities as hexagons but this doesnt make much sense tbh.
-					The hex's should always render and the entities should be dots on top of them -->
-					{@const points = hexagonPoints(position)}
-					<polygon
-						{points}
-						fill={entityColor(entity)}
-						stroke={selected ? 'white' : undefined}
-						stroke-width={0.4}
-					/>
-				{/if}
-			{/each}
+			{@render entitiesAsHexes(
+				game.entities.values().toArray(),
+				'location',
+				(e) => e.attributes.location !== null
+			)}
+
+			{@render entitiesAsHexes(game.entities.values().toArray(), 'player', (e) =>
+				e.markers.includes('player')
+			)}
 		</svg>
 	</div>
 
@@ -87,7 +83,7 @@
 								} else {
 									selectedEntity = entityId;
 								}
-							}}>{emojiFromMarkers(entity.markers)} {entity.name}</button
+							}}>{entityEmoji(entity)} {entity.name}</button
 						>
 					</li>
 				{/if}
@@ -132,6 +128,27 @@
 	</div>
 </div>
 
+{#snippet entitiesAsHexes(entities: Entity[], hexClass: string, filter: (e: Entity) => boolean)}
+	{#each entities as entity (entity.entity_id)}
+		{#if filter(entity)}
+			{@const selected = entity.entity_id === selectedEntity}
+			{@const position = entity.attributes.hex}
+			{#if position !== null}
+				<!-- Right now we are rendering entities as hexagons but this doesnt make much sense tbh.
+					The hex's should always render and the entities should be dots on top of them -->
+				{@const points = hexagonPoints(position)}
+				<polygon
+					class={hexClass}
+					{points}
+					fill={entityColor(entity)}
+					stroke={selected ? 'white' : undefined}
+					stroke-width={0.4}
+				/>
+			{/if}
+		{/if}
+	{/each}
+{/snippet}
+
 <style>
 	.wrapper {
 		width: 100%;
@@ -140,6 +157,10 @@
 		justify-content: center;
 		flex: 1;
 		align-self: stretch;
+	}
+
+	.location {
+		opacity: 0.2;
 	}
 
 	.logs {
