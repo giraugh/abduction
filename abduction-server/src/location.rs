@@ -138,7 +138,7 @@ pub fn generate_locations_for_world(world_radius: isize, biome: Biome) -> Vec<En
         loc_entities.push(Entity {
             entity_id: Entity::id(),
             name: format!("{loc_kind:?}"), // TODO; impl display or have like a set of possible names or soemthing?
-            markers: vec![EntityMarker::Viewable],
+            markers: vec![],
             relations: vec![],
             attributes: EntityAttributes {
                 hex: Some(*hex),
