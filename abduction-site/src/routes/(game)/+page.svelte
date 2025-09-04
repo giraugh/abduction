@@ -6,6 +6,7 @@
 
 	// TODO: generic focus system which lets us also look at a given hex etc
 	let selectedEntity = $state<string | null>(null);
+	let showAllEntities = $state(false);
 
 	function axialToCompass(hex: [number, number]) {
 		const [px, py] = axialToPixel(hex);
@@ -26,6 +27,7 @@
 		if (entity.attributes.corpse) return '💀';
 		if (entity.attributes.hazard) return '🔥';
 		if (entity.attributes.location) return '📍';
+		if (entity.attributes.food) return '🍽️';
 
 		return '';
 	}
@@ -70,10 +72,16 @@
 			<span>/</span>
 			<span>{playerCount} {pluralize('player', playerCount, 'players')}</span>
 		</h2>
+		<div class="filter-controls">
+			<label>
+				Show all entities
+				<input type="checkbox" bind:checked={showAllEntities} />
+			</label>
+		</div>
 		<ul class="entity-list">
 			{#each Array.from(game.entities.keys()).toSorted() as entityId (entityId)}
 				{@const entity = game.entities.get(entityId)!}
-				{#if entity.markers.includes('viewable')}
+				{#if entity.markers.includes('viewable') || showAllEntities}
 					<li>
 						<button
 							class:selected={entityId === selectedEntity}
@@ -267,6 +275,10 @@
 		& h2:first-of-type {
 			margin-top: 0;
 		}
+	}
+
+	.filter-controls {
+		margin-block: 1em;
 	}
 
 	@media (max-width: 700px) {

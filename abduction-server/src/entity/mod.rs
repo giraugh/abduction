@@ -3,6 +3,7 @@ pub mod motivator;
 
 pub use manager::*;
 
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -57,6 +58,9 @@ pub struct EntityAttributes {
     /// If set, this entity represents a location with the given location kind
     pub location: Option<EntityLocation>,
 
+    /// If set, this entity is edible
+    pub food: Option<EntityFood>,
+
     /// A primary hue to use when displaying this entity
     /// The value is a % out of 100 for use in HSL
     /// (e.g for player dots)
@@ -74,6 +78,30 @@ pub struct EntityHazard {
 #[qubit::ts]
 pub struct EntityLocation {
     pub location_kind: LocationKind,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[qubit::ts]
+pub struct EntityFood {
+    /// How good is this food?
+    /// a float between -1 and 1
+    /// -1 is worst poison
+    /// 1 is best food
+    pub sustenance: f32,
+}
+
+impl EntityFood {
+    pub fn healthy(rng: &mut impl Rng) -> Self {
+        Self {
+            sustenance: rng.random_range(0.0..1.0),
+        }
+    }
+
+    pub fn dubious(rng: &mut impl Rng) -> Self {
+        Self {
+            sustenance: rng.random_range(-1.0..0.7),
+        }
+    }
 }
 
 /// A type of entity relation

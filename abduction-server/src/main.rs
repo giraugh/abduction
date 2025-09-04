@@ -1,14 +1,17 @@
 mod brain;
+mod command;
 mod entity;
 mod hex;
 mod location;
 mod logs;
 mod mtch;
 mod player_gen;
+mod prop;
 
 use futures::{Stream, StreamExt};
 use qubit::{handler, Router};
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool};
+use std::sync::atomic;
 use std::{env, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::fs;
 use tokio::sync::broadcast;
@@ -19,6 +22,7 @@ use tokio_util::task::TaskTracker;
 use tracing::{debug, info, level_filters::LevelFilter, warn};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
+use crate::command::process_stdin_commands;
 use crate::entity::Entity;
 use crate::logs::GameLog;
 use crate::mtch::{MatchConfig, MatchManager, TickEvent};
@@ -50,6 +54,14 @@ struct QubitCtx {
     /// When a match is running,
     /// the match manager for that match
     match_manager: Arc<Mutex<Option<MatchManager>>>,
+
+    /// Flags that commands can set to change behaviour in ticks
+    flags: Arc<CtxFlags>,
+}
+
+#[derive(Debug, Default)]
+struct CtxFlags {
+    pub force_end_match: atomic::AtomicBool,
 }
 
 /// Get the current state of all entities
@@ -142,10 +154,12 @@ async fn main() {
 
     // Create a spot that could later be a match manager (youll see)
     let match_manager = Arc::default();
+    let ctx_flags = CtxFlags::default();
     let qubit_ctx = QubitCtx {
         tick_tx: tick_tx.clone(),
         log_tx: log_tx.clone(),
         db: db.clone(),
+        flags: Arc::new(ctx_flags),
         match_manager,
     };
 
@@ -221,6 +235,7 @@ async fn main() {
     // and/or load the schedule for the next one
     tracker.spawn({
         let token = token.clone();
+        let qubit_ctx = qubit_ctx.clone();
         let start_match_runner = async move {
             loop {
                 // Run the match...
@@ -232,6 +247,22 @@ async fn main() {
         async move {
             tokio::select! {
                 () = start_match_runner => {},
+                () = token.cancelled() => {},
+            }
+        }
+    });
+
+    // Listen for commands on stdin and handle them
+    tracker.spawn({
+        let token = token.clone();
+        let qubit_ctx = qubit_ctx.clone();
+        let handle_commands = async move {
+            process_stdin_commands(qubit_ctx).await.unwrap();
+        };
+
+        async move {
+            tokio::select! {
+                () = handle_commands => {},
                 () = token.cancelled() => {},
             }
         }
@@ -333,8 +364,13 @@ async fn tick_loop(ctx: QubitCtx) -> anyhow::Result<()> {
             let mm = maybe_mm
                 .as_mut()
                 .expect("Tick loop is running but match_manager isn't present...");
-            if mm.match_over() {
+            if mm.match_over() || ctx.flags.force_end_match.load(atomic::Ordering::Relaxed) {
                 info!("Match completed");
+
+                // Ensure flag is unset now
+                ctx.flags
+                    .force_end_match
+                    .store(false, atomic::Ordering::Relaxed);
 
                 // Update the config to set `complete=true`
                 mm.match_config.complete = true;

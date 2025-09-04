@@ -8,8 +8,9 @@ use rand::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    entity::{Entity, EntityAttributes, EntityLocation, EntityMarker},
+    entity::{Entity, EntityAttributes, EntityLocation},
     hex::AxialHex,
+    prop::PropGenerator,
 };
 
 /// Various biomes (effectively location sets)
@@ -34,6 +35,7 @@ pub enum LocationKind {
     SmallHut,
 }
 
+// Generation controls
 impl LocationKind {
     pub fn max_of_kind(&self) -> usize {
         match self {
@@ -65,6 +67,22 @@ impl LocationKind {
             LocationKind::Hill => 53.0,
             LocationKind::Mountain => 33.0,
             LocationKind::SmallHut => 281.0,
+        }
+    }
+
+    /// Optionally, a location can be associated with prop generators which can generate props in this location type
+    pub fn prop_generators(&self) -> &'static [PropGenerator] {
+        use PropGenerator::*;
+        const FOREST: &[PropGenerator] = &[PossiblyPoisonousFood, NaturalFood];
+        const PLAIN: &[PropGenerator] = &[NaturalFood];
+
+        match self {
+            LocationKind::Plain => PLAIN,
+            LocationKind::Hill => PLAIN,
+            LocationKind::Forest => FOREST,
+            LocationKind::River => &[],
+            LocationKind::Mountain => &[],
+            LocationKind::SmallHut => &[],
         }
     }
 }

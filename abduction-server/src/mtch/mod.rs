@@ -93,10 +93,29 @@ impl MatchManager {
         }
 
         // Generate a location entity in each hex
+        let mut rng = rand::rng();
         for entity in
             generate_locations_for_world(self.match_config.world_radius as isize, Biome::Green)
         {
-            self.match_entities.upsert_entity(entity)?;
+            // Create the location
+            self.match_entities.upsert_entity(entity.clone())?;
+
+            // Generate some amount of props in each hex
+            let hex = entity.attributes.hex.as_ref().unwrap();
+            let location_kind = entity.attributes.location.as_ref().unwrap().location_kind;
+            let prop_count = rng.random_range(0..5);
+            let prop_generators = location_kind.prop_generators();
+            if !prop_generators.is_empty() {
+                for _ in 0..prop_count {
+                    // Generate the entity
+                    let generator = prop_generators.choose(&mut rng).unwrap();
+                    let mut entity = generator.generate(&mut rng);
+
+                    // Set its location and insert it
+                    entity.attributes.hex = Some(*hex);
+                    self.match_entities.upsert_entity(entity)?;
+                }
+            }
         }
 
         // Put players in the desired locations
