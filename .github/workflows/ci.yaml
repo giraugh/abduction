@@ -59,6 +59,7 @@ jobs:
           host: ${{ vars.INSTANCE_HOST }}
           username: ${{ vars.INSTANCE_SSH_USERNAME }}
           key: ${{ secrets.INSTANCE_SSH_KEY }}
+          protocol: tcp6
           script: |
             cd ~
             docker-compose down
