@@ -53,6 +53,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v2
 
+      - name: Setup WARP
+        uses: fscarmen/warp-on-actions@v1.0
+
       - name: Deploy
         uses: appleboy/ssh-action@master
         with:
