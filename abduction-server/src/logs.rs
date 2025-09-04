@@ -60,6 +60,9 @@ pub enum GameLogBody {
         motivator: MotivatorKey,
     },
 
+    /// The primary entity consumed the secondary entity
+    EntityConsume,
+
     /// Entity A (a hazard) hurts entity B
     HazardHurt,
 }

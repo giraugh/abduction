@@ -31,7 +31,8 @@ function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverit
 				boredom: `${name} twiddles their thumbs`,
 				hunger: `${name}'s stomach grumbles`,
 				hurt: `${name} winces in pain`,
-				thirst: `${name} licks their dry lips`
+				thirst: `${name} licks their dry lips`,
+				sickness: `${name} looks pale`
 			} satisfies Record<MotivatorKey, string>
 		)[motivator];
 	}
@@ -42,7 +43,8 @@ function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverit
 				boredom: `${name} walks in circles`,
 				hunger: `${name}'s doubles over in hunger`,
 				hurt: `${name} groans in pain`,
-				thirst: `${name} coughes dryly` // TODO
+				thirst: `${name} coughes dryly`,
+				sickness: `${name} vomits`
 			} satisfies Record<MotivatorKey, string>
 		)[motivator];
 	}
@@ -61,6 +63,10 @@ export function logMessage(log: GameLog, game: Game) {
 	// Now consider the kind
 	if (log.kind === 'entity_movement') {
 		return `${primaryName} trekked ${formatDirection(log.by)}`;
+	}
+
+	if (log.kind === 'entity_consume') {
+		return `${primaryName} consumed a ${secondaryName}`;
 	}
 
 	if (log.kind === 'entity_motivator_bark') {

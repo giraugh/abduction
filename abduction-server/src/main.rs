@@ -1,4 +1,3 @@
-mod brain;
 mod command;
 mod entity;
 mod hex;

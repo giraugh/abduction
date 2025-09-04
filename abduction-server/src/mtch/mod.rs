@@ -24,8 +24,8 @@ use tokio::sync::broadcast;
 use tracing::info;
 
 use crate::{
-    brain::PlayerActionSideEffect,
     entity::{
+        brain::{PlayerActionResult, PlayerActionSideEffect},
         motivator, Entity, EntityAttributes, EntityHazard, EntityManager, EntityManagerMutation,
         EntityMarker,
     },
@@ -71,18 +71,18 @@ impl MatchManager {
         // Now we initialise it...
         info!("Initialising match {}", &self.match_config.match_id);
 
-        // Add all the unescaped players from the last game
+        // TODO: Add all the unescaped players from the last game
         // In practice, this just means cloning the entity into the new match
-        let mut existing_players = 0;
-        if let Some(preceding_match_id) = &self.match_config.preceding_match_id {
-            EntityManager::load_entities_from_match(preceding_match_id, db)
-                .await
-                .filter(|e| has_markers!(e, Player) && !has_markers!(e, Escaped))
-                .for_each(|entity| {
-                    existing_players += 1;
-                    unimplemented!(); // TODO: actually copy across the entity
-                })
-        }
+        let existing_players = 0;
+        // if let Some(preceding_match_id) = &self.match_config.preceding_match_id {
+        //     EntityManager::load_entities_from_match(preceding_match_id, db)
+        //         .await
+        //         .filter(|e| has_markers!(e, Player) && !has_markers!(e, Escaped))
+        //         .for_each(|entity| {
+        //             existing_players += 1;
+        //             unimplemented!(); // TODO: actually copy across the entity
+        //         })
+        // }
 
         // If we dont have enough players for the match configuration,
         // then generate and add more
@@ -152,11 +152,15 @@ impl MatchManager {
         // Lets just attempt to implement the main entity loop and see how we go I guess?
         // Rough plan is that each hex has one player action - the player who acted last acts now
         // This is encoded as the player with the highest `TicksWaited` attribute
-        let players_in_hexes = self
+        let all_entities = self
             .match_entities
             .get_all_entities()
+            .cloned()
+            .collect_vec();
+        let players_in_hexes = all_entities
+            .clone()
+            .into_iter()
             .filter(|e| has_markers!(e, Player))
-            .cloned() // :(
             .into_group_map_by(|e| e.attributes.hex.unwrap());
         for (_hex, players) in players_in_hexes {
             let mut rng = rand::rng();
@@ -180,7 +184,7 @@ impl MatchManager {
                     };
 
                     // Go update it
-                    match self.resolve_player_action(&mut player, &ctx.log_tx) {
+                    match self.resolve_player_action(&mut player, &all_entities, &ctx.log_tx) {
                         Some(PlayerActionSideEffect::Death) => {
                             // Remove that player entity
                             self.match_entities
@@ -201,6 +205,10 @@ impl MatchManager {
                                     ..Default::default()
                                 })
                                 .unwrap();
+                        }
+                        Some(PlayerActionSideEffect::RemoveOther(entity_id)) => {
+                            self.match_entities.remove_entity(&entity_id).unwrap();
+                            self.match_entities.upsert_entity(player).unwrap();
                         }
                         None => {
                             self.match_entities.upsert_entity(player).unwrap();
@@ -274,10 +282,23 @@ impl MatchManager {
     fn resolve_player_action(
         &mut self,
         player: &mut Entity,
+        all_entities: &Vec<Entity>,
         log_tx: &broadcast::Sender<GameLog>,
     ) -> Option<PlayerActionSideEffect> {
         let action = player.get_next_action();
-        player.resolve_action(action, &self.match_config, log_tx)
+        let result = player.resolve_action(action, all_entities, &self.match_config, log_tx);
+
+        // If the last thing they did had no result, they get bored
+        if matches!(result, PlayerActionResult::NoEffect) {
+            player
+                .attributes
+                .motivators
+                .bump_scaled::<motivator::Boredom>(2.0); // mostly temp for dev
+        } else {
+            player.attributes.motivators.clear::<motivator::Boredom>();
+        }
+
+        result.side_effect()
     }
 }
 

@@ -1,3 +1,4 @@
+pub mod brain;
 pub mod manager;
 pub mod motivator;
 

@@ -1,8 +1,9 @@
 use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::warn;
 
-use crate::brain::PlayerAction;
+use super::brain::PlayerAction;
 
 /// An attribute which "motivates" behaviour for an entity
 /// primarily represented by a single 0-1 float
@@ -48,11 +49,22 @@ impl MotivatorTable {
         data.motivation = (data.motivation + data.sensitivity).clamp(0.0, 1.0);
     }
 
-    /// Decrement a motivator by the standard rate
-    /// for now they always go down by 0.05
-    pub fn reduce<K: MotivatorTableKey>(&mut self) {
+    /// Increment a motivator by the sensitivity (with some scaling factor)
+    pub fn bump_scaled<K: MotivatorTableKey>(&mut self, scale: f32) {
         let data = self.0.get_mut(&K::TABLE_KEY).unwrap();
-        data.motivation = (data.motivation - 0.05).clamp(0.0, 1.0);
+        data.motivation = (data.motivation + data.sensitivity * scale).clamp(0.0, 1.0);
+    }
+
+    /// Clear out a motivation, setting it back to 0
+    pub fn clear<K: MotivatorTableKey>(&mut self) {
+        let data = self.0.get_mut(&K::TABLE_KEY).unwrap();
+        data.motivation = 0.0;
+    }
+
+    /// Decrement a motivator by the specified amount
+    pub fn reduce_by<K: MotivatorTableKey>(&mut self, by: f32) {
+        let data = self.0.get_mut(&K::TABLE_KEY).unwrap();
+        data.motivation = (data.motivation - by).clamp(0.0, 1.0);
     }
 }
 
@@ -89,8 +101,11 @@ macro_rules! declare_motivators {
                 let mut actions = Vec::new();
                 $(
                     {
-                      let behaviour_data = self.0.get(&$keys::TABLE_KEY).unwrap(); // TODO: actually handle missing motivators here
-                      actions.extend($keys::get_weighted_actions(behaviour_data.motivation).into_iter());
+                      if let Some(behaviour_data) = self.0.get(&$keys::TABLE_KEY) {
+                        actions.extend($keys::get_weighted_actions(behaviour_data.motivation).into_iter());
+                      } else {
+                          warn!("Entity is missing motivator data for {:?}", $keys::TABLE_KEY);
+                      }
                     }
                 )*
                 actions
@@ -105,7 +120,7 @@ macro_rules! declare_motivators {
     }
 }
 
-declare_motivators!({ Hunger, Thirst, Boredom, Hurt });
+declare_motivators!({ Hunger, Thirst, Boredom, Hurt, Sickness });
 
 pub trait MotivatorBehaviour {
     fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)>;
@@ -115,8 +130,14 @@ impl MotivatorBehaviour for Hunger {
     fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
         let mut actions = Vec::new();
 
-        if motivation > 0.5 {
-            actions.push((1, PlayerAction::Bark(motivation, MotivatorKey::Hunger)));
+        if motivation > 0.3 {
+            actions.push((
+                if motivation > 0.5 { 3 } else { 1 },
+                PlayerAction::Sequential(vec![
+                    PlayerAction::ConsumeFood,
+                    PlayerAction::Bark(motivation, MotivatorKey::Hunger),
+                ]),
+            ));
         }
 
         if motivation > 0.9 {
@@ -177,6 +198,20 @@ impl MotivatorBehaviour for Hurt {
         if motivation >= 0.99 {
             actions.push((100, PlayerAction::Death));
         }
+
+        actions
+    }
+}
+
+impl MotivatorBehaviour for Sickness {
+    fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
+        let mut actions = Vec::new();
+
+        if motivation > 0.0 {
+            actions.push((1, PlayerAction::Bark(motivation, MotivatorKey::Sickness)))
+        }
+
+        // TODO: some equivalent to pangs, basically it should cause hurt
 
         actions
     }

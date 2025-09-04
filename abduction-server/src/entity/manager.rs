@@ -116,6 +116,7 @@ impl EntityManager {
     }
 
     /// Static method which gets entities but does not save them against a manager
+    #[allow(unused)]
     pub async fn load_entities_from_match(
         match_id: &MatchId,
         db: &Db,
