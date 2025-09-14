@@ -7,6 +7,7 @@ mod mtch;
 mod player_gen;
 mod prop;
 
+use axum::routing::get;
 use futures::{Stream, StreamExt};
 use qubit::{handler, Router};
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool};
@@ -166,7 +167,9 @@ async fn main() {
     let (qubit_service, qubit_handle) = router.into_service(qubit_ctx.clone());
 
     // Nest into an Axum router
-    let axum_router = axum::Router::<()>::new().nest_service("/rpc", qubit_service);
+    let axum_router = axum::Router::<()>::new()
+        .route("/up", get(|| async { "Healthy" }))
+        .nest_service("/rpc", qubit_service);
 
     // Setup a task tracker
     let tracker = TaskTracker::new();
