@@ -1,0 +1,37 @@
+name: Setup CD (Kamal, SSH etc)
+
+inputs:
+  ssh_key:
+    description: "The private key to use when deploying over ssh"
+    required: true
+  ssh_host:
+    description: "The hostname to ssh into when deploying over ssh"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3
+
+    - name: Install Kamal
+      shell: bash
+      run: |
+        gem install kamal
+
+    - name: Add SSH key
+      shell: bash
+      env:
+        SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+      run: |
+        mkdir -p /home/runner/.ssh
+        ssh-keyscan ${{ inputs.ssh_host }} >> /home/runner/.ssh/known_hosts
+        echo "${{ inputs.ssh_key }}" > /home/runner/.ssh/github_actions
+        chmod 600 /home/runner/.ssh/github_actions
+        ssh-agent -a $SSH_AUTH_SOCK > /dev/null
+        ssh-add /home/runner/.ssh/github_actions

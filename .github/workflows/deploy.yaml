@@ -1,0 +1,46 @@
+name: Build and Push w/ Kamal
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  GHCR_REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  deploy-abduction-server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup CD
+        uses: ./.github/actions/setup-cd
+        with:
+          ssh_key: ${{ secrets.SSH_KEY }}
+          ssh_host: ${{ vars.SSH_HOST }}
+
+      - name: Build and push server 
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+        run: |
+          cd abduction-server && kamal deploy
+
+  deploy-abduction-site:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup CD
+        uses: ./.github/actions/setup-cd
+        with:
+          ssh_key: ${{ secrets.SSH_KEY }}
+          ssh_host: ${{ vars.SSH_HOST }}
+
+      - name: Build and push server 
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+        run: |
+          cd abduction-site && kamal deploy
