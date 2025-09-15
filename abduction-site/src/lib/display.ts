@@ -1,7 +1,7 @@
 import type { Entity } from '$lib/api.gen';
 
 export const HEX_SIZE = 2;
-export function axialToPixel(hex: [number, number], size = HEX_SIZE) {
+export function axialToPixel(hex: [number, number], size = HEX_SIZE): [number, number] {
 	const [q, r] = hex;
 	const x = size * (Math.sqrt(3) * q + (Math.sqrt(3) / 2) * r);
 	const y = size * ((3 / 2) * r);
@@ -36,11 +36,12 @@ export function axialHexRange(radius: number): [number, number][] {
 	return results;
 }
 
-export function entityColor(entity: Entity) {
+export function entityColor(entity: Entity, mode: 'hue' | 'lightness' = 'hue') {
 	// Otherwise get the hue
 	const hue = entity.attributes.display_color_hue;
 	if (!hue) return 'grey';
 
 	// And turn it into a color
-	return `hsl(${hue}deg, 50%, 50%)`;
+	if (mode === 'hue') return `hsl(${hue}deg, 50%, 50%)`;
+	if (mode === 'lightness') return `hsl(0deg, 0%, ${Math.floor((hue / 365) * 100)}%)`;
 }

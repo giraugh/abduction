@@ -1,10 +1,17 @@
-import type { Entity, GameLog, MatchConfig, TickEvent } from '$lib/api.gen';
+import type { AxialHex, Entity, GameLog, MatchConfig, TickEvent } from '$lib/api.gen';
 import { SvelteMap } from 'svelte/reactivity';
 import { logLevel, logMessage, type GameLogLevel } from './logs';
 
 export const LOG_BUFFER_LIMIT = 1000;
 
-export type DecoratedLog = GameLog & { message: string; level: GameLogLevel; id: number };
+export type DecoratedLog = GameLog & {
+	message: string;
+	level: GameLogLevel;
+	id: number;
+	involved_hexes: Array<AxialHex>;
+};
+
+type EntityUpdateHandler = (entity: Entity) => void;
 
 export class Game {
 	/** Map from entity ids to entity states -> only stores latest state */
@@ -19,6 +26,8 @@ export class Game {
 	loaded: boolean;
 	waitingForStart: boolean;
 
+	entityUpdateHandlers: Array<EntityUpdateHandler> = [];
+
 	constructor() {
 		this.entities = new SvelteMap();
 		this.logs = $state([]);
@@ -30,12 +39,24 @@ export class Game {
 		this.waitingForStart = $state(false);
 	}
 
+	onUpdate(handler: EntityUpdateHandler) {
+		this.entityUpdateHandlers.push(handler);
+
+		return () => {
+			this.entityUpdateHandlers = this.entityUpdateHandlers.filter((h) => h !== handler);
+		};
+	}
+
 	addLog(log: GameLog) {
 		// TODO: limit the size of this buffer
 		this.logs.push({
 			...log,
 			message: logMessage(log, this) ?? '...',
 			level: logLevel(log),
+			// @ts-ignore
+			involved_hexes: log.involved_entities
+				.map((e) => this.entities.get(e)?.attributes.hex)
+				.filter(Boolean),
 			id: this.logCounter++
 		});
 	}
@@ -53,6 +74,10 @@ export class Game {
 			for (const change of event.changes) {
 				if (change.kind === 'set_entity') {
 					this.entities.set(change.entity.entity_id, change.entity);
+
+					for (const handler of this.entityUpdateHandlers) {
+						handler(change.entity);
+					}
 				}
 
 				if (change.kind === 'remove_entity') {

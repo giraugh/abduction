@@ -3,9 +3,14 @@
 	import { axialHexRange, axialToPixel, entityColor, HEX_SIZE, hexagonPoints } from '$lib/display';
 	import { game } from '$lib/game.svelte';
 	import { capitalize, pluralize } from '@giraugh/tools';
+	import { SvelteMap } from 'svelte/reactivity';
 
-	// TODO: generic focus system which lets us also look at a given hex etc
-	let selectedEntity = $state<string | null>(null);
+	type Focus = { kind: 'entity'; entityId: string } | { kind: 'hex'; hex: [number, number] } | null;
+
+	let focus = $state<Focus>(null);
+	let focusedEntity = $derived(focus?.kind === 'entity' ? focus.entityId : null);
+	let focusedHex = $derived(focus?.kind === 'hex' ? focus.hex : null);
+
 	let showAllEntities = $state(false);
 
 	function axialToCompass(hex: [number, number]) {
@@ -32,12 +37,62 @@
 		return '';
 	}
 
+	function sameHex(a: [number, number], b: [number, number]): boolean {
+		return a[0] === b[0] && a[1] === b[1];
+	}
+
 	const logView = $derived.by(() => {
 		return game.logs.filter(
 			(l) =>
 				l.level === 'global' ||
-				(selectedEntity !== null && l.involved_entities.includes(selectedEntity))
+				(focusedEntity !== null && l.involved_entities.includes(focusedEntity)) ||
+				(focusedHex !== null && l.involved_hexes.some((h) => sameHex(h, focusedHex)))
 		);
+	});
+
+	function randomJitter(): [number, number] {
+		const JITTER = 0.6;
+		return [(2 * Math.random() - 1) * JITTER, (2 * Math.random() - 1) * JITTER];
+	}
+
+	// TODO: what I actually want to DO:
+	// - track how many players in each hex
+	//   and track which index each player is
+	// - then lay out the players at equal fractions of a circle, based on the count
+
+	let playerPositions = new SvelteMap<string, [number, number]>();
+	let playerJitter = new SvelteMap<string, [number, number]>();
+
+	$effect(() =>
+		game.onUpdate((e) => {
+			if (e.markers.includes('player')) {
+				if (e.attributes.hex) {
+					playerPositions.set(e.entity_id, e.attributes.hex);
+				}
+
+				if (!playerJitter.has(e.entity_id)) {
+					playerJitter.set(e.entity_id, randomJitter());
+				}
+			}
+		})
+	);
+
+	const hexCounts = $derived.by(() => {
+		return game.entities
+			.values()
+			.filter((e) => e.markers.includes('player') && e.attributes.hex !== null)
+			.map((e) => e.attributes.hex!)
+			.map((h) => `${h[0]}:${h[1]}`)
+			.reduce(
+				(acc, hk) => {
+					if (!(hk in acc)) {
+						acc[hk] = 0;
+					}
+					acc[hk] += 1;
+					return acc;
+				},
+				{} as Record<string, number>
+			);
 	});
 </script>
 
@@ -53,43 +108,81 @@
 				<polygon {points} fill="#555" />
 			{/each}
 
+			<!-- Render just the locations as hexs -->
 			{@render entitiesAsHexes(
 				game.entities.values().toArray(),
 				'location',
 				(e) => e.attributes.location !== null
 			)}
 
-			{@render entitiesAsHexes(game.entities.values().toArray(), 'player', (e) =>
-				e.markers.includes('player')
-			)}
+			<!-- Then render the players as dots -->
+			{#each playerPositions.entries() as [entityId, hex] (entityId)}
+				{@const entity = game.entities.get(entityId)}
+				{@const jitter = playerJitter.get(entityId)}
+				{@const sharing = hexCounts[`${hex[0]}:${hex[1]}`] > 1}
+				{#if hex && entity && jitter}
+					{@const [cx, cy] = axialToPixel(hex)}
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<circle
+						onclick={() => {
+							if (focusedEntity === entityId) {
+								focus = null;
+							} else {
+								focus = { kind: 'entity', entityId };
+							}
+						}}
+						class="player-circle"
+						class:focused={focusedEntity === entityId}
+						r="0.5"
+						cx={(sharing ? jitter[0] : 0) + cx}
+						cy={(sharing ? jitter[1] : 0) + cy}
+						fill={entityColor(entity)}
+					/>
+				{/if}
+			{/each}
 		</svg>
 	</div>
 
 	<div class="sidebar">
 		<!-- For now, just dump all the entities here -->
-		<h2>
-			<span>{entityCount} {pluralize('entity', entityCount, 'entities')}</span>
-			<span>/</span>
-			<span>{playerCount} {pluralize('player', playerCount, 'players')}</span>
-		</h2>
-		<div class="filter-controls">
-			<label>
-				Show all entities
-				<input type="checkbox" bind:checked={showAllEntities} />
-			</label>
-		</div>
+		{#if focus?.kind !== 'hex'}
+			<h2>
+				<span>{entityCount} {pluralize('entity', entityCount, 'entities')}</span>
+				<span>/</span>
+				<span>{playerCount} {pluralize('player', playerCount, 'players')}</span>
+			</h2>
+			<div class="filter-controls">
+				<label>
+					Show all entities
+					<input type="checkbox" bind:checked={showAllEntities} />
+				</label>
+			</div>
+		{:else}
+			<h2>
+				Showing entities in {axialToCompass(focus.hex)}
+			</h2>
+			<button class="deselect" onclick={() => (focus = null)}>Deselect</button>
+		{/if}
 		<ul class="entity-list">
 			{#each Array.from(game.entities.keys()).toSorted() as entityId (entityId)}
 				{@const entity = game.entities.get(entityId)!}
-				{#if entity.markers.includes('viewable') || showAllEntities}
+				{@const inFocusedHex =
+					focusedHex &&
+					entity.attributes.hex !== null &&
+					sameHex(entity.attributes.hex, focusedHex)}
+				{@const isFocusedEntity = focusedEntity && entity.entity_id === focusedEntity}
+				{@const canSeeGlobally = entity.markers.includes('viewable') || showAllEntities}
+				{@const showGlobal = focus?.kind !== 'hex'}
+				{#if showGlobal ? canSeeGlobally : inFocusedHex}
 					<li>
 						<button
-							class:selected={entityId === selectedEntity}
+							class:selected={isFocusedEntity}
 							onclick={() => {
-								if (selectedEntity === entityId) {
-									selectedEntity = null;
+								if (focusedEntity === entityId) {
+									focus = null;
 								} else {
-									selectedEntity = entityId;
+									focus = { kind: 'entity', entityId };
 								}
 							}}>{entityEmoji(entity)} {entity.name}</button
 						>
@@ -104,8 +197,8 @@
 			<div id="log-anchor"></div>
 		</ul>
 
-		{#if selectedEntity !== null}
-			{@const entity = game.entities.get(selectedEntity)}
+		{#if focusedEntity !== null}
+			{@const entity = game.entities.get(focusedEntity)}
 			{#if entity}
 				{@const loc = entity.attributes.hex ? axialToCompass(entity.attributes.hex) : 'unknown'}
 				{@const motivators = entity.attributes.motivators}
@@ -120,7 +213,13 @@
 						{/if}
 
 						{#if entity.attributes.hex !== null}
-							<tr><td>Location</td><td>{loc}</td></tr>
+							<tr
+								><td>Location</td><td
+									><button onclick={() => (focus = { kind: 'hex', hex: entity.attributes.hex! })}
+										>{loc}</button
+									></td
+								></tr
+							>
 						{/if}
 
 						{#each Object.keys(motivators).toSorted() as motivatorKey (motivatorKey)}
@@ -139,18 +238,29 @@
 {#snippet entitiesAsHexes(entities: Entity[], hexClass: string, filter: (e: Entity) => boolean)}
 	{#each entities as entity (entity.entity_id)}
 		{#if filter(entity)}
-			{@const selected = entity.entity_id === selectedEntity}
 			{@const position = entity.attributes.hex}
 			{#if position !== null}
 				<!-- Right now we are rendering entities as hexagons but this doesnt make much sense tbh.
 					The hex's should always render and the entities should be dots on top of them -->
 				{@const points = hexagonPoints(position)}
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<polygon
-					class={hexClass}
-					{points}
-					fill={entityColor(entity)}
-					stroke={selected ? 'white' : undefined}
+					onclick={() => {
+						if (focusedHex && sameHex(position, focusedHex)) {
+							focus = null;
+						} else {
+							focus = { kind: 'hex', hex: position };
+						}
+					}}
+					class={`hex ${hexClass}`}
+					class:focused={(focusedHex && sameHex(focusedHex, position)) ||
+						focusedEntity === entity.entity_id}
+					style:--fill={entityColor(entity, 'hue')}
+					style:--fill-l={entityColor(entity, 'lightness')}
+					fill="var(--fill-l)"
 					stroke-width={0.4}
+					{points}
 				/>
 			{/if}
 		{/if}
@@ -167,8 +277,32 @@
 		align-self: stretch;
 	}
 
+	.hex:hover,
+	.hex.focused {
+		fill: var(--fill);
+	}
+
+	.hex.focused {
+		stroke: white;
+	}
+
+	.deselect {
+		margin-block-end: 1em;
+	}
+
 	.location {
 		opacity: 0.2;
+	}
+
+	.player-circle {
+		transition:
+			cx 0.3s,
+			cy 0.3s;
+
+		&.focused {
+			stroke: white;
+			stroke-width: 0.2;
+		}
 	}
 
 	.logs {
