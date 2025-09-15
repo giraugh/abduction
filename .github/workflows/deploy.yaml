@@ -6,7 +6,7 @@ on:
       - main
 
 env:
-  GHCR_REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GHCR_REGISTRY_TOKEN: ${{ secrets.GHCR_TOKEN }}
 
 jobs:
   deploy-abduction-server:
