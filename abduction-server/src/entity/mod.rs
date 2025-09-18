@@ -6,6 +6,7 @@ pub use manager::*;
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use uuid::Uuid;
 
 use crate::{entity::motivator::MotivatorTable, hex::AxialHex, location::LocationKind};
@@ -32,8 +33,10 @@ pub enum EntityMarker {
 
 pub type EntityId = String; // TODO: use a uuid
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[qubit::ts]
+#[ts(optional_fields)]
 pub struct EntityAttributes {
     /// Nested motivators
     pub motivators: MotivatorTable,

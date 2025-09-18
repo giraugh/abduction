@@ -173,7 +173,7 @@
 				{@const entity = game.entities.get(entityId)!}
 				{@const inFocusedHex =
 					focusedHex &&
-					entity.attributes.hex !== null &&
+					entity.attributes.hex !== undefined &&
 					sameHex(entity.attributes.hex, focusedHex)}
 				{@const isFocusedEntity = focusedEntityId && entity.entity_id === focusedEntityId}
 				{@const canSeeGlobally = entity.markers.includes('viewable') || showAllEntities}
@@ -243,7 +243,7 @@
 	{#each entities as entity (entity.entity_id)}
 		{#if filter(entity)}
 			{@const position = entity.attributes.hex}
-			{#if position !== null}
+			{#if position !== undefined}
 				<!-- Right now we are rendering entities as hexagons but this doesnt make much sense tbh.
 					The hex's should always render and the entities should be dots on top of them -->
 				{@const points = hexagonPoints(position)}

@@ -211,7 +211,7 @@ impl MotivatorBehaviour for Hurt {
         let mut actions = Vec::new();
 
         if motivation > 0.5 {
-            actions.push((10, PlayerAction::Bark(motivation, MotivatorKey::Hurt)))
+            actions.push((5, PlayerAction::Bark(motivation, MotivatorKey::Hurt)))
         }
 
         // If fully "motivated" then die
