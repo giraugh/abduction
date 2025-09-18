@@ -32,7 +32,8 @@ function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverit
 				hunger: `${name}'s stomach grumbles`,
 				hurt: `${name} winces in pain`,
 				thirst: `${name} licks their dry lips`,
-				sickness: `${name} looks pale`
+				sickness: `${name} looks pale`,
+				tiredness: `${name} yawns`
 			} satisfies Record<MotivatorKey, string>
 		)[motivator];
 	}
@@ -43,8 +44,9 @@ function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverit
 				boredom: `${name} walks in circles`,
 				hunger: `${name}'s doubles over in hunger`,
 				hurt: `${name} groans in pain`,
-				thirst: `${name} coughes dryly`,
-				sickness: `${name} vomits`
+				thirst: `${name} coughs dryly`,
+				sickness: `${name} vomits`,
+				tiredness: `${name} is falling asleep`
 			} satisfies Record<MotivatorKey, string>
 		)[motivator];
 	}
@@ -69,6 +71,10 @@ export function logMessage(log: GameLog, game: Game) {
 		return `${primaryName} consumed a ${secondaryName}`;
 	}
 
+	if (log.kind === 'entity_drink_from') {
+		return `${primaryName} drank from ${secondaryName}`;
+	}
+
 	if (log.kind === 'entity_motivator_bark') {
 		const severity = log.motivation > 0.75 ? 'severe' : 'moderate';
 		return formatBark(primaryName, log.motivator, severity);
@@ -80,5 +86,21 @@ export function logMessage(log: GameLog, game: Game) {
 
 	if (log.kind === 'hazard_hurt') {
 		return `${secondaryName} was damaged by ${primaryName}`;
+	}
+
+	if (log.kind === 'entity_start_sleeping') {
+		return `${primaryName} lied down and closed their eyes`;
+	}
+
+	if (log.kind === 'entity_keep_sleeping') {
+		return `${primaryName} is sleeping soundly`;
+	}
+
+	if (log.kind === 'entity_stop_sleeping') {
+		return `${primaryName} wakes up`;
+	}
+
+	if (log.kind === 'entity_complain_about_taste') {
+		return `${primaryName} makes a face. The ${secondaryName} tasted horrible!`;
 	}
 }

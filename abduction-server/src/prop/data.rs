@@ -81,7 +81,31 @@ pub const NATURAL_FOOD: &[&str] = &[
     "onion",
 ];
 
-pub const DUBIOUS_QUALIFIER: &[&str] = &[
+pub const NATURAL_WATER_SOURCE: &[&str] = &[
+    "puddle",
+    "spring",
+    "brook",
+    "old well",
+    "creek",
+    "waterhole",
+    "run",
+    "rill",
+    "seep",
+];
+
+pub const QUALITY_WATER_SOURCE_QUALIFIER: &[&str] =
+    &["clear", "cyan", "pristine", "pure", "untainted"];
+
+pub const DUBIOUS_WATER_SOURCE_QUALIFIER: &[&str] = &[
+    "muddy",
+    "cloudy",
+    "dirty",
+    "vibrant green",
+    "vibrant pink",
+    "mosquito-ridden",
+];
+
+pub const DUBIOUS_FOOD_QUALIFIER: &[&str] = &[
     "putrid",
     "smelly",
     "glowing",

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use itertools::Itertools;
 use rand::{
     distr::{weighted::WeightedIndex, Distribution},
-    seq::SliceRandom,
+    seq::{IndexedRandom, SliceRandom},
 };
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +12,39 @@ use crate::{
     hex::AxialHex,
     prop::PropGenerator,
 };
+
+/// A list of required/optional prop generators for a location
+#[derive(Debug, Clone, Default)]
+pub struct LocPropGenerators {
+    /// One entity from each will be generated
+    pub required: Vec<PropGenerator>,
+
+    /// Each entity may be generated 0 or more times
+    pub optional: Vec<PropGenerator>,
+}
+
+impl LocPropGenerators {
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    pub fn with_required(mut self, generator: PropGenerator) -> Self {
+        self.required.push(generator);
+        self
+    }
+
+    pub fn with_optional(mut self, generator: PropGenerator) -> Self {
+        self.optional.push(generator);
+        self
+    }
+
+    pub fn generate_optional_at(&self, location: AxialHex, mut rng: &mut impl rand::Rng) -> Entity {
+        let generator = self.optional.choose(&mut rng).unwrap();
+        let mut entity = generator.generate(&mut rng);
+        entity.attributes.hex = Some(location);
+        entity
+    }
+}
 
 /// Various biomes (effectively location sets)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -29,7 +62,7 @@ pub enum Biome {
 pub enum LocationKind {
     Plain,
     Forest,
-    River,
+    Lake,
     Hill,
     Mountain,
     SmallHut,
@@ -41,7 +74,7 @@ impl LocationKind {
         match self {
             LocationKind::Plain => 9999,
             LocationKind::Forest => 9999,
-            LocationKind::River => 30,
+            LocationKind::Lake => 5,
             LocationKind::Hill => 100,
             LocationKind::Mountain => 30,
             LocationKind::SmallHut => 2,
@@ -52,7 +85,7 @@ impl LocationKind {
         match self {
             LocationKind::Plain => 2,
             LocationKind::Forest => 3,
-            LocationKind::River => 2,
+            LocationKind::Lake => 0,
             LocationKind::Hill => 2,
             LocationKind::Mountain => 2,
             LocationKind::SmallHut => 0,
@@ -63,7 +96,7 @@ impl LocationKind {
         match self {
             LocationKind::Plain => 129.0,
             LocationKind::Forest => 154.0,
-            LocationKind::River => 219.0,
+            LocationKind::Lake => 219.0,
             LocationKind::Hill => 53.0,
             LocationKind::Mountain => 33.0,
             LocationKind::SmallHut => 281.0,
@@ -71,18 +104,23 @@ impl LocationKind {
     }
 
     /// Optionally, a location can be associated with prop generators which can generate props in this location type
-    pub fn prop_generators(&self) -> &'static [PropGenerator] {
+    pub fn prop_generators(&self) -> LocPropGenerators {
         use PropGenerator::*;
-        const FOREST: &[PropGenerator] = &[PossiblyPoisonousFood, NaturalFood];
-        const PLAIN: &[PropGenerator] = &[NaturalFood];
-
         match self {
-            LocationKind::Plain => PLAIN,
-            LocationKind::Hill => PLAIN,
-            LocationKind::Forest => FOREST,
-            LocationKind::River => &[],
-            LocationKind::Mountain => &[],
-            LocationKind::SmallHut => &[],
+            LocationKind::Plain => LocPropGenerators::default().with_optional(NaturalFood),
+            LocationKind::Hill => LocPropGenerators::default().with_optional(NaturalFood),
+            LocationKind::Forest => LocPropGenerators::default()
+                .with_optional(PossiblyPoisonousFood)
+                .with_optional(NaturalFood)
+                .with_optional(QualityNaturalWaterSource)
+                .with_optional(DubiousNaturalWaterSource),
+            LocationKind::Lake => LocPropGenerators::default()
+                .with_required(Lake)
+                .with_optional(Fish),
+            LocationKind::Mountain => {
+                LocPropGenerators::default().with_optional(QualityNaturalWaterSource)
+            }
+            LocationKind::SmallHut => LocPropGenerators::none(),
         }
     }
 }
@@ -91,7 +129,7 @@ impl Biome {
     pub fn all_locations(&self) -> Vec<LocationKind> {
         use LocationKind::*;
         match self {
-            Biome::Green => vec![Plain, Forest, Mountain, Hill, SmallHut],
+            Biome::Green => vec![Plain, Forest, Lake, Mountain, Hill, SmallHut],
         }
     }
 }

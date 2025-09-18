@@ -3,12 +3,11 @@ use rand::{
     seq::IteratorRandom,
 };
 use tokio::sync::broadcast;
-use tracing::info;
 
 use crate::{
     entity::{
         motivator::{self, MotivatorKey},
-        Entity, EntityId,
+        Entity, EntityAsleep, EntityId, EntityWaterSource,
     },
     hex::AxialHexDirection,
     logs::{GameLog, GameLogBody},
@@ -36,6 +35,13 @@ pub enum PlayerAction {
 
     /// Attempt to eat any food entity at current location
     ConsumeFood,
+
+    /// Keep sleeping zzzzz
+    Sleep,
+
+    /// Drink from a water source at current location
+    /// (including water that looks bad?)
+    DrinkFromWaterSource { try_dubious: bool },
 
     /// Hurt by lack of food
     HungerPangs,
@@ -99,6 +105,12 @@ impl Entity {
     /// Determine the next action to be taken by an entity
     /// Only applicable for players
     pub fn get_next_action(&self) -> PlayerAction {
+        // Are we asleep? Then only valid action is sleeping
+        // (This is decoupled from tiredness in case we have some other way of causing sleep)
+        if self.attributes.asleep.is_some() {
+            return PlayerAction::Sleep;
+        }
+
         // Get the weighted actions from each motivator
         let mut action_weights = self.attributes.motivators.get_weighted_actions();
 
@@ -146,6 +158,43 @@ impl Entity {
                 return PlayerActionResult::NoEffect;
             }
 
+            PlayerAction::Sleep => {
+                match self.attributes.asleep.clone() {
+                    // If we are alreay sleeping, keep sleeping
+                    Some(asleep) => {
+                        // Wake up?
+                        if asleep.remaining_turns <= 1 {
+                            self.attributes.asleep = None;
+
+                            // Its very beneficial!
+                            self.attributes.motivators.clear::<motivator::Tiredness>();
+                            self.attributes.motivators.reduce_by::<motivator::Hurt>(0.2);
+
+                            log_tx
+                                .send(GameLog::entity(self, GameLogBody::EntityStopSleeping))
+                                .unwrap();
+                        } else {
+                            self.attributes.asleep.as_mut().unwrap().remaining_turns -= 1;
+
+                            log_tx
+                                .send(GameLog::entity(self, GameLogBody::EntityKeepSleeping))
+                                .unwrap();
+                        }
+                    }
+
+                    // Otherwise, start sleeping now
+                    None => {
+                        self.attributes.asleep = Some(EntityAsleep { remaining_turns: 5 });
+
+                        log_tx
+                            .send(GameLog::entity(self, GameLogBody::EntityStartSleeping))
+                            .unwrap();
+                    }
+                };
+
+                return PlayerActionResult::Ok;
+            }
+
             // Literally die
             PlayerAction::Death => {
                 log_tx
@@ -190,11 +239,6 @@ impl Entity {
                     .motivators
                     .reduce_by::<motivator::Hunger>(food.sustenance);
 
-                // was it poisonous
-                if food.sustenance < 0.0 {
-                    self.attributes.motivators.bump::<motivator::Sickness>();
-                }
-
                 // emit log
                 log_tx
                     .send(GameLog::entity_pair(
@@ -204,10 +248,83 @@ impl Entity {
                     ))
                     .unwrap();
 
+                // was it poisonous
+                if food.sustenance < 0.0 {
+                    self.attributes.motivators.bump::<motivator::Sickness>();
+
+                    log_tx
+                        .send(GameLog::entity_pair(
+                            self,
+                            food_entity,
+                            GameLogBody::EntityComplainAboutTaste,
+                        ))
+                        .unwrap();
+                }
+
                 // Return side effect to remove the food
                 return PlayerActionResult::SideEffect(PlayerActionSideEffect::RemoveOther(
                     food_entity.entity_id.clone(),
                 ));
+            }
+
+            PlayerAction::DrinkFromWaterSource { try_dubious } => {
+                // Is there food at this location?
+                let mut rng = rand::rng();
+                let water_source_entities = all_entities
+                    .iter()
+                    .filter(|e| {
+                        e.attributes.hex.is_some() && e.attributes.hex == self.attributes.hex
+                    })
+                    .filter(|e| match e.attributes.water_source {
+                        // its dubious, are we okay with that?
+                        Some(EntityWaterSource { poison }) if poison > 0.0 => *try_dubious,
+
+                        // not dubious (fallthrough)
+                        Some(EntityWaterSource { .. }) => true,
+
+                        // its not a water source
+                        None => false,
+                    });
+
+                // If no applicable water source, there's no effect
+                let Some(water_source_entity) = water_source_entities.choose(&mut rng) else {
+                    return PlayerActionResult::NoEffect;
+                };
+
+                // if there is, drink from it
+                let water_source = water_source_entity
+                    .attributes
+                    .water_source
+                    .as_ref()
+                    .unwrap();
+
+                // Fully clear thirst
+                self.attributes.motivators.clear::<motivator::Thirst>();
+
+                // Emit log
+                log_tx
+                    .send(GameLog::entity_pair(
+                        self,
+                        water_source_entity,
+                        GameLogBody::EntityDrinkFrom,
+                    ))
+                    .unwrap();
+
+                // Should we get sick?
+                if water_source.poison > 0.0 {
+                    self.attributes
+                        .motivators
+                        .bump_scaled::<motivator::Sickness>(2.0 * water_source.poison);
+                    log_tx
+                        .send(GameLog::entity_pair(
+                            self,
+                            water_source_entity,
+                            GameLogBody::EntityComplainAboutTaste,
+                        ))
+                        .unwrap();
+                }
+
+                return PlayerActionResult::Ok;
             }
 
             PlayerAction::HungerPangs => {
@@ -215,7 +332,7 @@ impl Entity {
             }
 
             PlayerAction::ThirstPangs => {
-                self.attributes.motivators.bump::<motivator::Thirst>();
+                self.attributes.motivators.bump::<motivator::Hurt>();
             }
 
             // Moving in a given hex direction
@@ -228,6 +345,12 @@ impl Entity {
                 let new_hex = *hex + (*hex_direction).into();
                 if new_hex.within_bounds(config.world_radius as isize) {
                     *hex = new_hex;
+
+                    // If succesfull, get thirsty and tired
+                    self.attributes.motivators.bump::<motivator::Thirst>();
+                    self.attributes
+                        .motivators
+                        .bump_scaled::<motivator::Tiredness>(0.3);
 
                     log_tx
                         .send(GameLog::entity(

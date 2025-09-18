@@ -62,10 +62,23 @@ pub struct EntityAttributes {
     /// If set, this entity is edible
     pub food: Option<EntityFood>,
 
+    /// If set, this entity is an infinite water source
+    pub water_source: Option<EntityWaterSource>,
+
+    /// Is this entity asleep?
+    pub asleep: Option<EntityAsleep>,
+
     /// A primary hue to use when displaying this entity
     /// The value is a % out of 100 for use in HSL
     /// (e.g for player dots)
     pub display_color_hue: Option<f32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[qubit::ts]
+pub struct EntityAsleep {
+    /// How asleep are they?
+    pub remaining_turns: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -81,6 +94,7 @@ pub struct EntityLocation {
     pub location_kind: LocationKind,
 }
 
+/// Consumable food
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[qubit::ts]
 pub struct EntityFood {
@@ -101,6 +115,28 @@ impl EntityFood {
     pub fn dubious(rng: &mut impl Rng) -> Self {
         Self {
             sustenance: rng.random_range(-1.0..0.7),
+        }
+    }
+}
+
+/// An infinite water source
+/// All water is just as good at quenching thirst and all water sources are infinite
+/// so we just care about whether its tainted by disease/poison etc
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[qubit::ts]
+pub struct EntityWaterSource {
+    /// Poison between 0 and 1 -> 1 is worst poison
+    pub poison: f32,
+}
+
+impl EntityWaterSource {
+    pub fn quality() -> Self {
+        Self { poison: 0.0 }
+    }
+
+    pub fn dubious(rng: &mut impl Rng) -> Self {
+        Self {
+            poison: rng.random_range(0.0..1.0),
         }
     }
 }

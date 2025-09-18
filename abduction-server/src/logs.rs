@@ -60,6 +60,22 @@ pub enum GameLogBody {
         motivator: MotivatorKey,
     },
 
+    /// Entity consumed some food or drank some water that turned out to be low quality
+    /// and caused sickness
+    EntityComplainAboutTaste,
+
+    /// The primary entity drank from the secondary entity
+    EntityDrinkFrom,
+
+    /// The primary entity starts sleeping
+    EntityStartSleeping,
+
+    /// The primary entity continues to sleep
+    EntityKeepSleeping,
+
+    /// The primary entity stops sleeping
+    EntityStopSleeping,
+
     /// The primary entity consumed the secondary entity
     EntityConsume,
 

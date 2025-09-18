@@ -105,14 +105,19 @@ impl MatchManager {
             let location_kind = entity.attributes.location.as_ref().unwrap().location_kind;
             let prop_count = rng.random_range(0..5);
             let prop_generators = location_kind.prop_generators();
-            if !prop_generators.is_empty() {
-                for _ in 0..prop_count {
-                    // Generate the entity
-                    let generator = prop_generators.choose(&mut rng).unwrap();
-                    let mut entity = generator.generate(&mut rng);
 
-                    // Set its location and insert it
-                    entity.attributes.hex = Some(*hex);
+            // Generate required entities for location type
+            for required_generator in &prop_generators.required {
+                let mut entity = required_generator.generate(&mut rng);
+                // Set its location and insert it
+                entity.attributes.hex = Some(*hex);
+                self.match_entities.upsert_entity(entity)?;
+            }
+
+            // Generate a few from the optional generators
+            if !prop_generators.optional.is_empty() {
+                for _ in 0..prop_count {
+                    let entity = prop_generators.generate_optional_at(*hex, &mut rng);
                     self.match_entities.upsert_entity(entity)?;
                 }
             }
@@ -276,6 +281,12 @@ impl MatchManager {
             } else {
                 player.attributes.motivators.bump::<motivator::Thirst>();
             }
+        }
+
+        // Or tired?
+        // TODO: more at night
+        if rng.random_bool(0.005) {
+            player.attributes.motivators.bump::<motivator::Tiredness>();
         }
     }
 

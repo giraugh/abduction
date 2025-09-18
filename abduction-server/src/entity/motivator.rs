@@ -45,26 +45,38 @@ impl MotivatorTable {
 
     /// Increment a motivator by the sensitivity
     pub fn bump<K: MotivatorTableKey>(&mut self) {
-        let data = self.0.get_mut(&K::TABLE_KEY).unwrap();
-        data.motivation = (data.motivation + data.sensitivity).clamp(0.0, 1.0);
+        if let Some(data) = self.0.get_mut(&K::TABLE_KEY) {
+            data.motivation = (data.motivation + data.sensitivity).clamp(0.0, 1.0);
+        } else {
+            warn!("Entity is missing motivator data for {:?}", K::TABLE_KEY);
+        }
     }
 
     /// Increment a motivator by the sensitivity (with some scaling factor)
     pub fn bump_scaled<K: MotivatorTableKey>(&mut self, scale: f32) {
-        let data = self.0.get_mut(&K::TABLE_KEY).unwrap();
-        data.motivation = (data.motivation + data.sensitivity * scale).clamp(0.0, 1.0);
+        if let Some(data) = self.0.get_mut(&K::TABLE_KEY) {
+            data.motivation = (data.motivation + data.sensitivity * scale).clamp(0.0, 1.0);
+        } else {
+            warn!("Entity is missing motivator data for {:?}", K::TABLE_KEY);
+        }
     }
 
     /// Clear out a motivation, setting it back to 0
     pub fn clear<K: MotivatorTableKey>(&mut self) {
-        let data = self.0.get_mut(&K::TABLE_KEY).unwrap();
-        data.motivation = 0.0;
+        if let Some(data) = self.0.get_mut(&K::TABLE_KEY) {
+            data.motivation = 0.0;
+        } else {
+            warn!("Entity is missing motivator data for {:?}", K::TABLE_KEY);
+        }
     }
 
     /// Decrement a motivator by the specified amount
     pub fn reduce_by<K: MotivatorTableKey>(&mut self, by: f32) {
-        let data = self.0.get_mut(&K::TABLE_KEY).unwrap();
-        data.motivation = (data.motivation - by).clamp(0.0, 1.0);
+        if let Some(data) = self.0.get_mut(&K::TABLE_KEY) {
+            data.motivation = (data.motivation - by).clamp(0.0, 1.0);
+        } else {
+            warn!("Entity is missing motivator data for {:?}", K::TABLE_KEY);
+        }
     }
 }
 
@@ -120,7 +132,7 @@ macro_rules! declare_motivators {
     }
 }
 
-declare_motivators!({ Hunger, Thirst, Boredom, Hurt, Sickness });
+declare_motivators!({ Hunger, Thirst, Boredom, Hurt, Sickness, Tiredness });
 
 pub trait MotivatorBehaviour {
     fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)>;
@@ -132,7 +144,7 @@ impl MotivatorBehaviour for Hunger {
 
         if motivation > 0.3 {
             actions.push((
-                if motivation > 0.5 { 3 } else { 1 },
+                if motivation > 0.5 { 30 } else { 10 },
                 PlayerAction::Sequential(vec![
                     PlayerAction::ConsumeFood,
                     PlayerAction::Bark(motivation, MotivatorKey::Hunger),
@@ -153,11 +165,19 @@ impl MotivatorBehaviour for Thirst {
         let mut actions = Vec::new();
 
         if motivation > 0.5 {
-            actions.push((1, PlayerAction::Bark(motivation, MotivatorKey::Thirst)));
+            actions.push((
+                10,
+                PlayerAction::Sequential(vec![
+                    PlayerAction::DrinkFromWaterSource { try_dubious: false },
+                    PlayerAction::DrinkFromWaterSource { try_dubious: true },
+                    // TODO: Try to move towards water
+                    PlayerAction::Bark(motivation, MotivatorKey::Thirst),
+                ]),
+            ));
         }
 
         if motivation > 0.8 {
-            actions.push((1, PlayerAction::ThirstPangs));
+            actions.push((10, PlayerAction::ThirstPangs));
         }
 
         actions
@@ -169,7 +189,7 @@ impl MotivatorBehaviour for Boredom {
         let mut actions = Vec::new();
 
         if motivation > 0.5 {
-            actions.push((1, PlayerAction::Bark(motivation, MotivatorKey::Boredom)));
+            actions.push((2, PlayerAction::Bark(motivation, MotivatorKey::Boredom)));
         }
 
         // If bored enough, do a random movement
@@ -178,7 +198,7 @@ impl MotivatorBehaviour for Boredom {
                 PlayerAction::all_movements()
                     .iter()
                     .cloned()
-                    .map(|action| (3, action)),
+                    .map(|action| (25, action)),
             );
         }
 
@@ -191,12 +211,12 @@ impl MotivatorBehaviour for Hurt {
         let mut actions = Vec::new();
 
         if motivation > 0.5 {
-            actions.push((1, PlayerAction::Bark(motivation, MotivatorKey::Hurt)))
+            actions.push((10, PlayerAction::Bark(motivation, MotivatorKey::Hurt)))
         }
 
         // If fully "motivated" then die
         if motivation >= 0.99 {
-            actions.push((100, PlayerAction::Death));
+            actions.push((1000, PlayerAction::Death));
         }
 
         actions
@@ -208,10 +228,29 @@ impl MotivatorBehaviour for Sickness {
         let mut actions = Vec::new();
 
         if motivation > 0.0 {
-            actions.push((1, PlayerAction::Bark(motivation, MotivatorKey::Sickness)))
+            // TODO
+            // Chance for the sickness to just get worse on its own..
+            // actions.push((10, PlayerAction::Bark(motivation, MotivatorKey::Sickness)))
+        }
+
+        if motivation > 0.5 {
+            actions.push((10, PlayerAction::Bark(motivation, MotivatorKey::Sickness)))
         }
 
         // TODO: some equivalent to pangs, basically it should cause hurt
+
+        actions
+    }
+}
+
+impl MotivatorBehaviour for Tiredness {
+    fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
+        let mut actions = Vec::new();
+
+        if motivation > 0.8 {
+            actions.push((20, PlayerAction::Bark(motivation, MotivatorKey::Tiredness)));
+            actions.push((if motivation > 0.95 { 50 } else { 10 }, PlayerAction::Sleep));
+        }
 
         actions
     }

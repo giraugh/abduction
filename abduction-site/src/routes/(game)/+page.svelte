@@ -8,8 +8,10 @@
 	type Focus = { kind: 'entity'; entityId: string } | { kind: 'hex'; hex: [number, number] } | null;
 
 	let focus = $state<Focus>(null);
-	let focusedEntity = $derived(focus?.kind === 'entity' ? focus.entityId : null);
+	let focusedEntityId = $derived(focus?.kind === 'entity' ? focus.entityId : null);
 	let focusedHex = $derived(focus?.kind === 'hex' ? focus.hex : null);
+
+	let focusedEntity = $derived(game.entities.get(focusedEntityId ?? ''));
 
 	let showAllEntities = $state(false);
 
@@ -45,8 +47,10 @@
 		return game.logs.filter(
 			(l) =>
 				l.level === 'global' ||
-				(focusedEntity !== null && l.involved_entities.includes(focusedEntity)) ||
-				(focusedHex !== null && l.involved_hexes.some((h) => sameHex(h, focusedHex)))
+				(focusedEntityId !== null && l.involved_entities.includes(focusedEntityId)) ||
+				(focusedHex !== null && l.involved_hexes.some((h) => sameHex(h, focusedHex))) ||
+				(focusedEntity?.attributes.corpse &&
+					l.involved_entities.includes(focusedEntity.attributes.corpse))
 		);
 	});
 
@@ -126,14 +130,14 @@
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<circle
 						onclick={() => {
-							if (focusedEntity === entityId) {
+							if (focusedEntityId === entityId) {
 								focus = null;
 							} else {
 								focus = { kind: 'entity', entityId };
 							}
 						}}
 						class="player-circle"
-						class:focused={focusedEntity === entityId}
+						class:focused={focusedEntityId === entityId}
 						r="0.5"
 						cx={(sharing ? jitter[0] : 0) + cx}
 						cy={(sharing ? jitter[1] : 0) + cy}
@@ -171,7 +175,7 @@
 					focusedHex &&
 					entity.attributes.hex !== null &&
 					sameHex(entity.attributes.hex, focusedHex)}
-				{@const isFocusedEntity = focusedEntity && entity.entity_id === focusedEntity}
+				{@const isFocusedEntity = focusedEntityId && entity.entity_id === focusedEntityId}
 				{@const canSeeGlobally = entity.markers.includes('viewable') || showAllEntities}
 				{@const showGlobal = focus?.kind !== 'hex'}
 				{#if showGlobal ? canSeeGlobally : inFocusedHex}
@@ -179,7 +183,7 @@
 						<button
 							class:selected={isFocusedEntity}
 							onclick={() => {
-								if (focusedEntity === entityId) {
+								if (focusedEntityId === entityId) {
 									focus = null;
 								} else {
 									focus = { kind: 'entity', entityId };
@@ -197,8 +201,8 @@
 			<div id="log-anchor"></div>
 		</ul>
 
-		{#if focusedEntity !== null}
-			{@const entity = game.entities.get(focusedEntity)}
+		{#if focusedEntityId !== null}
+			{@const entity = game.entities.get(focusedEntityId)}
 			{#if entity}
 				{@const loc = entity.attributes.hex ? axialToCompass(entity.attributes.hex) : 'unknown'}
 				{@const motivators = entity.attributes.motivators}
@@ -255,7 +259,7 @@
 					}}
 					class={`hex ${hexClass}`}
 					class:focused={(focusedHex && sameHex(focusedHex, position)) ||
-						focusedEntity === entity.entity_id}
+						focusedEntityId === entity.entity_id}
 					style:--fill={entityColor(entity, 'hue')}
 					style:--fill-l={entityColor(entity, 'lightness')}
 					fill="var(--fill-l)"
