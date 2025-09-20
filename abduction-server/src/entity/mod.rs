@@ -1,6 +1,7 @@
 pub mod brain;
 pub mod manager;
 pub mod motivator;
+pub mod world;
 
 pub use manager::*;
 
@@ -9,7 +10,11 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use uuid::Uuid;
 
-use crate::{entity::motivator::MotivatorTable, hex::AxialHex, location::LocationKind};
+use crate::{
+    entity::{motivator::MotivatorTable, world::EntityWorld},
+    hex::AxialHex,
+    location::LocationKind,
+};
 
 /// These are sort of tags that can be associated with an entity
 ///
@@ -82,6 +87,9 @@ pub struct EntityAttributes {
 
     /// Is this entity asleep?
     pub asleep: Option<EntityAsleep>,
+
+    /// The current details of the world
+    pub world: Option<EntityWorld>,
 
     /// A primary hue to use when displaying this entity
     /// The value is a % out of 100 for use in HSL

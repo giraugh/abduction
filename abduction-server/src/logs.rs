@@ -1,7 +1,11 @@
 use serde::Serialize;
 
 use crate::{
-    entity::{motivator::MotivatorKey, Entity, EntityId},
+    entity::{
+        motivator::MotivatorKey,
+        world::{TimeOfDay, WeatherKind},
+        Entity, EntityId,
+    },
     hex::{AxialHex, AxialHexDirection},
 };
 
@@ -23,6 +27,14 @@ pub struct GameLog {
 }
 
 impl GameLog {
+    pub fn global(body: GameLogBody) -> Self {
+        Self {
+            hex: None,
+            involved_entities: vec![],
+            body,
+        }
+    }
+
     pub fn entity(entity: &Entity, body: GameLogBody) -> Self {
         Self {
             hex: entity.attributes.hex,
@@ -48,6 +60,12 @@ pub enum GameLogBody {
     /// An entity moving from one hex to another
     EntityMovement { by: AxialHexDirection },
 
+    /// The time of day changed
+    TimeOfDayChange { time_of_day: TimeOfDay },
+
+    /// The weather changed
+    WeatherChange { weather: WeatherKind },
+
     /// An entity death
     EntityDeath,
 
@@ -59,6 +77,12 @@ pub enum GameLogBody {
         motivation: f32,
         motivator: MotivatorKey,
     },
+
+    /// Entity is getting cold because they are exposed at night
+    EntityColdBecauseOfTime,
+
+    /// Entity is getting wet because of rain
+    EntitySaturatedBecauseOfRain,
 
     /// Entity heading for low-lying area
     EntityGoDownhill,

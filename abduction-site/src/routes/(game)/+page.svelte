@@ -7,26 +7,27 @@
 
 	type Focus = { kind: 'entity'; entityId: string } | { kind: 'hex'; hex: [number, number] } | null;
 
+	let showAllEntities = $state(false);
+
 	let focus = $state<Focus>(null);
 	let focusedEntityId = $derived(focus?.kind === 'entity' ? focus.entityId : null);
 	let focusedHex = $derived(focus?.kind === 'hex' ? focus.hex : null);
 	let focusedEntity = $derived(game.entities.get(focusedEntityId ?? ''));
 
-	let showAllEntities = $state(false);
+	let worldRadius = $derived(game.config?.world_radius ?? 0);
+	let limits = $derived(HEX_SIZE * worldRadius * 2);
+	let entityCount = $derived(game.entities.size);
+	let playerCount = $derived(
+		Array.from(game.entities.values()).filter((e) => e.markers.includes('player')).length
+	);
+	let worldState = $derived(
+		game.entities.values().find((e) => e.attributes.world !== undefined)?.attributes.world
+	);
 
 	function axialToCompass(hex: [number, number]) {
 		const [px, py] = axialToPixel(hex);
 		return `${Math.floor(Math.abs(py) / HEX_SIZE)}°${py >= 0 ? 'S' : 'N'} ${Math.floor(Math.abs(px) / HEX_SIZE)}°${px >= 0 ? 'E' : 'W'}`;
 	}
-
-	// TODO: from some kind of config
-	let worldRadius = $derived(game.config?.world_radius ?? 0);
-	let limits = $derived(HEX_SIZE * worldRadius * 2);
-
-	let entityCount = $derived(game.entities.size);
-	let playerCount = $derived(
-		Array.from(game.entities.values()).filter((e) => e.markers.includes('player')).length
-	);
 
 	function entityEmoji(entity: Entity) {
 		if (entity.markers.includes('player')) return '🤷‍♂️';
@@ -65,7 +66,6 @@
 
 	let playerPositions = new SvelteMap<string, [number, number]>();
 	let playerJitter = new SvelteMap<string, [number, number]>();
-
 	$effect(() =>
 		game.onUpdate((e) => {
 			if (e.markers.includes('player')) {
@@ -105,6 +105,13 @@
 
 <div class="wrapper">
 	<div class="svg-container">
+		{#if worldState}
+			<div class="world-state-panel">
+				<strong>{worldState.time_of_day}</strong>
+				<strong>{worldState.weather}</strong>
+			</div>
+		{/if}
+
 		<svg class="world-svg" viewBox={`${-limits} ${-limits} ${limits * 2} ${limits * 2}`}>
 			{#each axialHexRange(worldRadius) as hex (hex.join(','))}
 				{@const points = hexagonPoints(hex)}
@@ -214,11 +221,11 @@
 				</div>
 				<table class="attribute-table">
 					<tbody>
-						{#if entity.attributes.age !== null}
+						{#if entity.attributes.age !== undefined}
 							<tr><td>Age</td><td>{entity.attributes.age}</td></tr>
 						{/if}
 
-						{#if entity.attributes.hex !== null}
+						{#if entity.attributes.hex !== undefined}
 							<tr
 								><td>Location</td><td
 									><button onclick={() => (focus = { kind: 'hex', hex: entity.attributes.hex! })}
@@ -415,7 +422,8 @@
 		align-self: stretch;
 		padding: 1em;
 		flex: 1;
-		min-width: 300px;
+		min-width: 350px;
+		box-sizing: border-box;
 
 		& h2:first-of-type {
 			margin-top: 0;
@@ -436,5 +444,18 @@
 			flex: 1;
 			width: 100%;
 		}
+	}
+
+	.world-state-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2em;
+		background: var(--surface);
+		padding: 1em;
+		position: relative;
+		left: 100%;
+		transform: translateX(calc(-100% - 1em));
+		top: 1em;
+		width: max-content;
 	}
 </style>

@@ -168,7 +168,7 @@ macro_rules! declare_motivators {
     }
 }
 
-declare_motivators!({ Hunger, Thirst, Boredom, Hurt, Sickness, Tiredness, Saturation });
+declare_motivators!({ Hunger, Thirst, Boredom, Hurt, Sickness, Tiredness, Saturation, Cold });
 
 pub trait MotivatorBehaviour {
     fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)>;
@@ -371,6 +371,41 @@ impl MotivatorBehaviour for Saturation {
 
             // Just slowly become dry
             actions.push((10, PlayerAction::ReduceMotivator(MotivatorKey::Saturation)));
+        }
+
+        actions
+    }
+}
+
+impl MotivatorBehaviour for Cold {
+    fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
+        let mut actions = Vec::new();
+
+        // You can always just passively recover,
+        // this way a source of cold has to be on-going
+        if motivation > 0.0 {
+            actions.push((
+                2,
+                PlayerAction::Sequential(vec![
+                    PlayerAction::Bark(motivation, MotivatorKey::Cold),
+                    PlayerAction::ReduceMotivator(MotivatorKey::Cold),
+                ]),
+            ));
+        }
+
+        // TODO: more intelligent plans like finding shelter etc
+
+        // The cold just makes you tired for now
+        // and maybe sick?
+        if motivation > 0.5 {
+            actions.push((5, PlayerAction::BumpMotivator(MotivatorKey::Tiredness)));
+            actions.push((2, PlayerAction::BumpMotivator(MotivatorKey::Sickness)));
+            actions.push((10, PlayerAction::Bark(motivation, MotivatorKey::Cold)));
+        }
+
+        // and hurt in the absolute worst case
+        if motivation > 0.95 {
+            actions.push((5, PlayerAction::BumpMotivator(MotivatorKey::Hurt)));
         }
 
         actions

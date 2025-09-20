@@ -103,7 +103,7 @@
 
 		--bg: #222;
 		--surface: #333;
-		--nav-height: 2em;
+		--nav-height: 4em;
 	}
 
 	main,
@@ -125,6 +125,7 @@
 		justify-content: space-between;
 		padding-inline-end: 1.5em;
 		height: var(--nav-height);
+		box-sizing: border-box;
 
 		& h1 {
 			margin: 0;

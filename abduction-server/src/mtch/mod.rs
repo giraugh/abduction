@@ -26,8 +26,10 @@ use tracing::info;
 use crate::{
     entity::{
         brain::{PlayerActionResult, PlayerActionSideEffect},
-        motivator, Entity, EntityAttributes, EntityFood, EntityHazard, EntityManager,
-        EntityManagerMutation, EntityMarker,
+        motivator,
+        world::EntityWorld,
+        Entity, EntityAttributes, EntityFood, EntityHazard, EntityManager, EntityManagerMutation,
+        EntityMarker,
     },
     has_markers,
     hex::AxialHex,
@@ -123,6 +125,17 @@ impl MatchManager {
             }
         }
 
+        // Establish the current state of the world
+        self.match_entities.upsert_entity(Entity {
+            entity_id: Entity::id(),
+            name: "World".into(),
+            attributes: EntityAttributes {
+                world: Some(EntityWorld::default()),
+                ..Default::default()
+            },
+            ..Default::default()
+        })?;
+
         // Put players in the desired locations
         // TODO
 
@@ -154,14 +167,40 @@ impl MatchManager {
     /// Perform one game tick
     /// When a match is on, this is called every second or so to update the state of the world
     pub async fn perform_match_tick(&mut self, ctx: &QubitCtx) {
-        // Lets just attempt to implement the main entity loop and see how we go I guess?
-        // Rough plan is that each hex has one player action - the player who acted last acts now
-        // This is encoded as the player with the highest `TicksWaited` attribute
+        // Get all entities
         let all_entities = self
             .match_entities
             .get_all_entities()
             .cloned()
             .collect_vec();
+
+        // Perform world updates
+        let current_world_state = {
+            let mut rng = rand::rng();
+            let mut world_entity = all_entities
+                .iter()
+                .find(|e| e.attributes.world.is_some())
+                .expect("Expected world entity to exist")
+                .clone();
+
+            if rng.random_bool(0.005) {
+                world_entity
+                    .attributes
+                    .world
+                    .as_mut()
+                    .unwrap()
+                    .update(&ctx.log_tx, &mut rng);
+                self.match_entities
+                    .upsert_entity(world_entity.clone())
+                    .unwrap();
+            }
+
+            world_entity.attributes.world.unwrap()
+        };
+
+        // Lets just attempt to implement the main entity loop and see how we go I guess?
+        // Rough plan is that each hex has one player action - the player who acted last acts now
+        // This is encoded as the player with the highest `TicksWaited` attribute
         let players_in_hexes = all_entities
             .clone()
             .into_iter()
@@ -174,7 +213,11 @@ impl MatchManager {
             {
                 if let Some(entity) = players.choose(&mut rng) {
                     let mut player = entity.clone();
-                    self.resolve_world_effect_on_player(&mut player, &ctx.log_tx);
+                    self.resolve_world_effect_on_player(
+                        &mut player,
+                        &current_world_state,
+                        &ctx.log_tx,
+                    );
                     self.match_entities.upsert_entity(player).unwrap();
                 }
             }
@@ -247,6 +290,7 @@ impl MatchManager {
     fn resolve_world_effect_on_player(
         &self,
         player: &mut Entity,
+        current_world_state: &EntityWorld,
         log_tx: &broadcast::Sender<GameLog>,
     ) {
         let mut rng = rand::rng();
@@ -308,6 +352,40 @@ impl MatchManager {
             } else {
                 player.attributes.motivators.bump::<motivator::Thirst>();
             }
+        }
+
+        // Is it cold?
+        let cold_chance_scale_from_time = current_world_state
+            .time_of_day
+            .current_temp_as_cold_proc_chance_scale();
+        let cold_chance_scale_from_wind = current_world_state.weather.wind_proc_chance_scale();
+        let cold_chance = cold_chance_scale_from_time * cold_chance_scale_from_wind;
+        if rng.random_bool((cold_chance as f64) * 0.02) {
+            // TODO: prob need a way to find shelter or warm up huh
+            player.attributes.motivators.bump::<motivator::Cold>();
+
+            // Emit log
+            log_tx
+                .send(GameLog::entity(
+                    player,
+                    GameLogBody::EntityColdBecauseOfTime,
+                ))
+                .unwrap();
+        }
+
+        // Is it raining?
+        let rain_chance_scale = current_world_state.weather.rain_proc_chance_scale();
+        if rng.random_bool((rain_chance_scale as f64) * 0.02) {
+            // TODO: prob need a way to find shelter or warm up huh
+            player.attributes.motivators.bump::<motivator::Saturation>();
+
+            // Emit log
+            log_tx
+                .send(GameLog::entity(
+                    player,
+                    GameLogBody::EntitySaturatedBecauseOfRain,
+                ))
+                .unwrap();
         }
 
         // Or tired?

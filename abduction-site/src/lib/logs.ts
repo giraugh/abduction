@@ -7,6 +7,7 @@ export type BarkSeverity = 'moderate' | 'severe';
 
 /** Given a game log, determine how important it is */
 export function logLevel(log: GameLog) {
+	if (log.involved_entities.length === 0) return 'global';
 	if (log.kind === 'entity_death') return 'global';
 	return 'local';
 }
@@ -34,7 +35,8 @@ function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverit
 				thirst: `${name} licks their dry lips`,
 				sickness: `${name} looks pale`,
 				tiredness: `${name} yawns`,
-				saturation: `${name} has water dripping off of them`
+				saturation: `${name} has water dripping off of them`,
+				cold: `${name} is shivering`
 			} satisfies Record<MotivatorKey, string>
 		)[motivator];
 	}
@@ -48,7 +50,8 @@ function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverit
 				thirst: `${name} coughs dryly`,
 				sickness: `${name} vomits`,
 				tiredness: `${name} is falling asleep`,
-				saturation: `${name} looks absolutely drenched`
+				saturation: `${name} looks absolutely drenched`,
+				cold: `${name} looks extremely cold`
 			} satisfies Record<MotivatorKey, string>
 		)[motivator];
 	}
@@ -65,6 +68,14 @@ export function logMessage(log: GameLog, game: Game) {
 	const secondaryName = entities?.[1]?.name ?? 'Someone';
 
 	// Now consider the kind
+	if (log.kind === 'weather_change') {
+		return `The weather is now ${log.weather}`;
+	}
+
+	if (log.kind === 'time_of_day_change') {
+		return `It is now ${log.time_of_day}`;
+	}
+
 	if (log.kind === 'entity_movement') {
 		return `${primaryName} trekked ${formatDirection(log.by)}`;
 	}
@@ -120,5 +131,13 @@ export function logMessage(log: GameLog, game: Game) {
 
 	if (log.kind === 'entity_complain_about_taste') {
 		return `${primaryName} makes a face. The ${secondaryName} tasted horrible!`;
+	}
+
+	if (log.kind === 'entity_cold_because_of_time') {
+		return `${primaryName} shivers in the cold wind`;
+	}
+
+	if (log.kind === 'entity_saturated_because_of_rain') {
+		return `${primaryName} is getting thoroughly rained on`;
 	}
 }
