@@ -26,6 +26,23 @@ pub enum EntityMarker {
     /// Whether this can be viewed in the inspector
     Viewable,
 
+    /// Something alive
+    Being,
+
+    /// A resource of some kind
+    /// something thats potentially helpful to a player
+    /// e.g food, water, items, weapons, etc
+    /// NOTE: can be a geological feature, item, gear, person - like literally anything
+    Resource,
+
+    /// A resource that helps out with thirst somehow
+    /// (used for planning by players)
+    ThirstResource,
+
+    /// A resource that helps out with hunger somehow
+    /// (used for planning by players)
+    HungerResource,
+
     /// Whether the player escaped on the ship
     /// Maybe remove this later
     Escaped,
@@ -224,13 +241,21 @@ impl From<Entity> for EntityPayload {
 }
 
 #[macro_export]
+macro_rules! create_markers {
+    ($($markers: expr),*) => {{
+        use $crate::entity::EntityMarker::*;
+        vec![$($markers),*]
+    }}
+}
+
+#[macro_export]
 macro_rules! has_markers {
     ($e: expr, $marker: expr) => {{
-        use EntityMarker::*;
+        use $crate::entity::EntityMarker::*;
         ($e).markers.contains(&$marker)
     }};
     ($e: expr, $marker: expr, $($markers: expr),+) => {{
-        use EntityMarker::*;
+        use $crate::entity::EntityMarker::*;
         ($e).markers.contains(&$marker) && (has_markers!($e, $($markers),+))
     }};
 }

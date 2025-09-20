@@ -5,7 +5,10 @@ mod data;
 use data::*;
 use rand::seq::IndexedRandom;
 
-use crate::entity::{Entity, EntityAttributes, EntityFood, EntityWaterSource};
+use crate::{
+    create_markers,
+    entity::{Entity, EntityAttributes, EntityFood, EntityWaterSource},
+};
 
 /// These are different generators that can create types of props
 /// locations can be associated with prop generators to seed the world in this locations
@@ -102,6 +105,7 @@ impl PropGenerator {
                     }),
                     ..Default::default()
                 },
+                markers: create_markers!(Resource, HungerResource),
                 ..Default::default()
             },
 
@@ -121,6 +125,7 @@ impl PropGenerator {
                         }),
                         ..Default::default()
                     },
+                    markers: create_markers!(Resource, ThirstResource),
                     ..Default::default()
                 }
             }
@@ -133,6 +138,7 @@ impl PropGenerator {
                     food: Some(EntityFood::healthy(rng)),
                     ..Default::default()
                 },
+                markers: create_markers!(Resource, HungerResource),
                 ..Default::default()
             },
 
@@ -143,6 +149,7 @@ impl PropGenerator {
                     water_source: Some(EntityWaterSource::quality()),
                     ..Default::default()
                 },
+                markers: create_markers!(Resource, ThirstResource),
                 ..Default::default()
             },
         }

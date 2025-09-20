@@ -7,7 +7,7 @@ use tokio::sync::broadcast;
 use crate::{
     entity::{
         motivator::{self, MotivatorKey},
-        Entity, EntityAsleep, EntityId, EntityWaterSource,
+        Entity, EntityAsleep, EntityId, EntityMarker, EntityWaterSource,
     },
     hex::AxialHexDirection,
     logs::{GameLog, GameLogBody},
@@ -23,6 +23,9 @@ pub enum PlayerAction {
 
     /// Try each action in the list until one works
     Sequential(Vec<PlayerAction>),
+
+    /// Go to any adjacent hex with an entity that has the given marker
+    GoToAdjacent(Vec<EntityMarker>),
 
     /// Die and be removed from the game
     Death,
@@ -202,6 +205,11 @@ impl Entity {
                     .unwrap();
 
                 return PlayerActionResult::SideEffect(PlayerActionSideEffect::Death);
+            }
+
+            PlayerAction::GoToAdjacent(markers) => {
+                // TODO
+                unimplemented!();
             }
 
             // Indicating a high motivator value

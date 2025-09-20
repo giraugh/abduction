@@ -6,6 +6,7 @@ use std::io::{BufReader, Read, Seek};
 use std::sync::LazyLock;
 use std::{io::SeekFrom, os::unix::fs::MetadataExt, path::PathBuf};
 
+use crate::create_markers;
 use crate::entity::motivator::MotivatorTable;
 use crate::entity::{Entity, EntityAttributes, EntityMarker};
 use crate::hex::AxialHex;
@@ -38,13 +39,9 @@ pub fn generate_player() -> anyhow::Result<Entity> {
     //    TODO: take all bonds, filter down by compatability with age etc
     // }
 
-    // Initialise empty set of markers and relations
-    let mut markers: Vec<EntityMarker> = Vec::new();
+    // Initialise empty relations and standard set of markers for players
     let relations: Vec<_> = Vec::new();
-
-    // Add the player marker
-    markers.push(EntityMarker::Player);
-    markers.push(EntityMarker::Viewable);
+    let markers = create_markers!(Player, Viewable, Being);
 
     // Generate some random player attributes
     // (primarily motivators but a few others)
