@@ -204,7 +204,6 @@ pub fn generate_locations_for_world(world_radius: isize, biome: Biome) -> Vec<En
 
                 display_color_hue: Some(loc_kind.temp_hue()),
 
-                // TODO: store the location
                 ..Default::default()
             },
         });

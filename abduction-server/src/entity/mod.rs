@@ -29,21 +29,6 @@ pub enum EntityMarker {
     /// Something alive
     Being,
 
-    /// A resource of some kind
-    /// something thats potentially helpful to a player
-    /// e.g food, water, items, weapons, etc
-    /// NOTE: can be a geological feature, item, gear, person - like literally anything
-    Resource,
-
-    /// A resource that helps out with thirst somehow
-    /// (used for planning by players)
-    /// NOTE:
-    ThirstResource,
-
-    /// A resource that helps out with hunger somehow
-    /// (used for planning by players)
-    HungerResource,
-
     /// Whether the player escaped on the ship
     /// Maybe remove this later
     Escaped,
