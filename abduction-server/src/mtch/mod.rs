@@ -134,7 +134,7 @@ impl MatchManager {
             self.match_entities.upsert_entity(Entity {
                 entity_id: Entity::id(),
                 name: format!("Lava Hazard {i}"),
-                markers: vec![EntityMarker::Viewable],
+                markers: vec![EntityMarker::DefaultInspectable],
                 attributes: EntityAttributes {
                     hex: Some(position),
                     hazard: Some(EntityHazard { damage: 1 }),
@@ -200,7 +200,7 @@ impl MatchManager {
                             self.match_entities
                                 .upsert_entity(Entity {
                                     entity_id: Entity::id(),
-                                    markers: vec![EntityMarker::Viewable],
+                                    markers: vec![EntityMarker::DefaultInspectable],
                                     name: format!("Corpse of {}", &player.name),
                                     attributes: EntityAttributes {
                                         hex: player.attributes.hex,

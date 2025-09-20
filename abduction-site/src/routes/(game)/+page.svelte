@@ -176,7 +176,7 @@
 					entity.attributes.hex !== undefined &&
 					sameHex(entity.attributes.hex, focusedHex)}
 				{@const isFocusedEntity = focusedEntityId && entity.entity_id === focusedEntityId}
-				{@const canSeeGlobally = entity.markers.includes('viewable') || showAllEntities}
+				{@const canSeeGlobally = entity.markers.includes('default_inspectable') || showAllEntities}
 				{@const showGlobal = focus?.kind !== 'hex'}
 				{#if showGlobal ? canSeeGlobally : inFocusedHex}
 					<li>
@@ -187,6 +187,7 @@
 									focus = null;
 								} else {
 									focus = { kind: 'entity', entityId };
+									console.info('Focus', game.entities.get(entityId));
 								}
 							}}>{entityEmoji(entity)} {entity.name}</button
 						>

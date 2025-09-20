@@ -7,11 +7,12 @@
 	<h2>Entities</h2>
 	<ul class="debug-list">
 		{#each game.entities as [entityId, entity] (entityId)}
-			{@const isViewable = entity.markers.includes('viewable')}
-			<li title={entityId} class:viewable={isViewable}>
+			{@const isInspectable = entity.markers.includes('default_inspectable')}
+			<li title={entityId} class:inspectable={isInspectable}>
 				<details>
 					<h3>Markers</h3>
 					<ul class="markers">
+						{JSON.stringify(entity.markers)}
 						{#each entity.markers as marker (marker)}
 							<li>{marker}</li>
 						{/each}
@@ -64,7 +65,7 @@
 			cursor: pointer;
 		}
 
-		& li:not(.viewable) {
+		& li:not(.inspectable) {
 			opacity: 0.5;
 		}
 	}

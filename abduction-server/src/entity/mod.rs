@@ -23,8 +23,8 @@ pub enum EntityMarker {
     /// Maybe remove this later
     Player,
 
-    /// Whether this can be viewed in the inspector
-    Viewable,
+    /// Whether this shows in the inspector by default without searching for it
+    DefaultInspectable,
 
     /// Something alive
     Being,
@@ -37,6 +37,7 @@ pub enum EntityMarker {
 
     /// A resource that helps out with thirst somehow
     /// (used for planning by players)
+    /// NOTE:
     ThirstResource,
 
     /// A resource that helps out with hunger somehow
