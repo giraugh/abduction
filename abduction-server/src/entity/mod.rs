@@ -26,6 +26,15 @@ pub enum EntityMarker {
     /// Whether this shows in the inspector by default without searching for it
     DefaultInspectable,
 
+    /// A location which is particularly lush
+    /// has a lot of plants etc
+    /// typically implies it also generates water sources
+    LushLocation,
+
+    /// A location which is low-lying on a world scale
+    /// typically but not necessarily implies it has available water (e.g a lake)
+    LowLyingLocation,
+
     /// Something alive
     Being,
 
@@ -101,26 +110,40 @@ pub struct EntityLocation {
 }
 
 /// Consumable food
+/// TODO: restructure this to just have seperate sustenance and poison fields
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[qubit::ts]
 pub struct EntityFood {
-    /// How good is this food?
-    /// a float between -1 and 1
-    /// -1 is worst poison
-    /// 1 is best food
+    /// How filling is this food?
+    /// (0-1)
     pub sustenance: f32,
+
+    /// Is it poisonous?
+    pub poison: f32,
+
+    /// Is it "wrong" to eat this?
+    /// i.e a corpse etc
+    pub morally_wrong: bool,
 }
 
 impl EntityFood {
     pub fn healthy(rng: &mut impl Rng) -> Self {
         Self {
             sustenance: rng.random_range(0.0..1.0),
+            poison: 0.0,
+            morally_wrong: false,
         }
     }
 
     pub fn dubious(rng: &mut impl Rng) -> Self {
         Self {
-            sustenance: rng.random_range(-1.0..0.7),
+            sustenance: rng.random_range(0.0..0.5),
+            poison: if rng.random_bool(0.7) {
+                rng.random_range(0.0..1.0)
+            } else {
+                0.0
+            },
+            morally_wrong: false,
         }
     }
 }

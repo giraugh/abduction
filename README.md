@@ -5,20 +5,18 @@ on a hex grid w/ event logs from each hex.
 
 ## TODO
 
+Fun Feature Ideas
+- Day/Night Cycle
+- Weather / Temperature
+- Forming Allies
+- Owning Pets
+- Collecting and Holding Resources
+- Players greeting each other
+- Memories
+
 Websocket Death
 - Resuming websocket when dead
 - Backport this to qubit
-
-Environment Generation
-- Each match has a biome
-- biome informs possible locations
-- each hex has a location
-- locations inform pre-match entity gen (props)
-- locations may have other effects (e.g can be a hazard)
-
-Graphics
-- Clean up the way the map is displayed
-- We want entities to be rendered not as full hexagons, but as dots or something in each hex
 
 Migration Safety
 - When we make certain changes, I want to update some kind of version tag and then force a new game to be deployed when the CI build runs

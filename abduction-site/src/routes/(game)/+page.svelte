@@ -10,7 +10,6 @@
 	let focus = $state<Focus>(null);
 	let focusedEntityId = $derived(focus?.kind === 'entity' ? focus.entityId : null);
 	let focusedHex = $derived(focus?.kind === 'hex' ? focus.hex : null);
-
 	let focusedEntity = $derived(game.entities.get(focusedEntityId ?? ''));
 
 	let showAllEntities = $state(false);
@@ -116,7 +115,7 @@
 			{@render entitiesAsHexes(
 				game.entities.values().toArray(),
 				'location',
-				(e) => e.attributes.location !== null
+				(e) => e.attributes.location !== undefined
 			)}
 
 			<!-- Then render the players as dots -->
@@ -187,7 +186,6 @@
 									focus = null;
 								} else {
 									focus = { kind: 'entity', entityId };
-									console.info('Focus', game.entities.get(entityId));
 								}
 							}}>{entityEmoji(entity)} {entity.name}</button
 						>
@@ -211,6 +209,9 @@
 				<h2>
 					{entity.name} <span class="color-dot" style:background={entityColor(entity)}></span>
 				</h2>
+				<div class="markers">
+					{entity.markers.join(' ')}
+				</div>
 				<table class="attribute-table">
 					<tbody>
 						{#if entity.attributes.age !== null}
@@ -292,6 +293,11 @@
 	}
 
 	.deselect {
+		margin-block-end: 1em;
+	}
+
+	.markers {
+		opacity: 0.3;
 		margin-block-end: 1em;
 	}
 

@@ -1,13 +1,15 @@
+use itertools::Itertools;
 use rand::{
     distr::{weighted::WeightedIndex, Distribution},
-    seq::IteratorRandom,
+    seq::{IndexedRandom, IteratorRandom},
 };
 use tokio::sync::broadcast;
+use tracing::warn;
 
 use crate::{
     entity::{
         motivator::{self, MotivatorKey},
-        Entity, EntityAsleep, EntityId, EntityMarker, EntityWaterSource,
+        Entity, EntityAsleep, EntityFood, EntityId, EntityMarker, EntityWaterSource,
     },
     hex::AxialHexDirection,
     logs::{GameLog, GameLogBody},
@@ -21,11 +23,24 @@ pub enum PlayerAction {
     /// (This always causes the "NoEffect" result)
     Nothing,
 
+    /// Increase some motivator by the sensitivity
+    BumpMotivator(MotivatorKey),
+
+    /// Decrease some motivator by the sensitivity
+    ReduceMotivator(MotivatorKey),
+
     /// Try each action in the list until one works
     Sequential(Vec<PlayerAction>),
 
-    /// Go to any adjacent hex with an entity that has the given marker
-    GoToAdjacent(Vec<EntityMarker>),
+    /// Travel towards (the nearest?) hex which has an entity with any of the given markers
+    /// NOTE: if already at such a location, this will do nothing (and cause NoEffect)
+    /// NOTE: requires a log that will be emited interstitially if a suitable hex can be found
+    GoTowards(GameLogBody, Vec<EntityMarker>),
+
+    /// Move to an adjacent hex where an entity resides with any of the given markers
+    /// NOTE: if already at such a location, this will do nothing (and cause NoEffect)
+    /// NOTE: requires a log that will be emited interstitially if a suitable hex can be found
+    GoToAdjacent(GameLogBody, Vec<EntityMarker>),
 
     /// Die and be removed from the game
     Death,
@@ -37,7 +52,10 @@ pub enum PlayerAction {
     Move(AxialHexDirection),
 
     /// Attempt to eat any food entity at current location
-    ConsumeFood,
+    ConsumeFood {
+        try_dubious: bool,
+        try_morally_wrong: bool,
+    },
 
     /// Keep sleeping zzzzz
     Sleep,
@@ -45,12 +63,6 @@ pub enum PlayerAction {
     /// Drink from a water source at current location
     /// (including water that looks bad?)
     DrinkFromWaterSource { try_dubious: bool },
-
-    /// Hurt by lack of food
-    HungerPangs,
-
-    /// Hurt by lack of water
-    ThirstPangs,
 }
 
 #[derive(Clone, Debug)]
@@ -161,6 +173,16 @@ impl Entity {
                 return PlayerActionResult::NoEffect;
             }
 
+            PlayerAction::BumpMotivator(key) => {
+                self.attributes.motivators.bump_key(*key);
+                return PlayerActionResult::Ok;
+            }
+
+            PlayerAction::ReduceMotivator(key) => {
+                self.attributes.motivators.reduce_key(*key);
+                return PlayerActionResult::Ok;
+            }
+
             PlayerAction::Sleep => {
                 match self.attributes.asleep.clone() {
                     // If we are alreay sleeping, keep sleeping
@@ -187,7 +209,10 @@ impl Entity {
 
                     // Otherwise, start sleeping now
                     None => {
-                        self.attributes.asleep = Some(EntityAsleep { remaining_turns: 5 });
+                        // TODO: make this based on something ig
+                        self.attributes.asleep = Some(EntityAsleep {
+                            remaining_turns: 25,
+                        });
 
                         log_tx
                             .send(GameLog::entity(self, GameLogBody::EntityStartSleeping))
@@ -207,9 +232,122 @@ impl Entity {
                 return PlayerActionResult::SideEffect(PlayerActionSideEffect::Death);
             }
 
-            PlayerAction::GoToAdjacent(markers) => {
-                // TODO
-                unimplemented!();
+            PlayerAction::GoToAdjacent(log_body, markers) => {
+                let mut rng = rand::rng();
+
+                // Do we have a valid hex?
+                let Some(my_hex) = self.attributes.hex else {
+                    warn!("Attempted to search for adjacent entities but player has no hex");
+                    return PlayerActionResult::NoEffect;
+                };
+
+                // Is the current hex such a hex?
+                let current_hex_valid = all_entities.iter().any(|e| {
+                    e.attributes.hex.is_some()
+                        && e.attributes.hex == Some(my_hex)
+                        && markers.iter().any(|m| e.markers.contains(m))
+                });
+
+                if current_hex_valid {
+                    return PlayerActionResult::NoEffect;
+                }
+
+                // If not, pull all applicable adjacent entities
+                let adj_entities = all_entities
+                    .iter()
+                    .filter(|e| match e.attributes.hex {
+                        None => false,
+                        Some(hex) => hex.is_adjacent(my_hex),
+                    })
+                    .filter(|e| markers.iter().any(|m| e.markers.contains(m)))
+                    .collect_vec();
+
+                // If no relevant adjacent hexs, we cant do anything
+                if adj_entities.is_empty() {
+                    return PlayerActionResult::NoEffect;
+                }
+
+                // But if there is, choose one at random
+                let chosen_entity = adj_entities.choose(&mut rng).unwrap();
+                let hex = chosen_entity.attributes.hex.unwrap();
+                let direction = AxialHexDirection::direction_to(my_hex, hex)
+                    .expect("Cannot determine direction to adj hex");
+
+                // Emit log
+                log_tx
+                    .send(GameLog::entity(self, log_body.clone()))
+                    .unwrap();
+
+                // Travel towards that hex
+                return self.resolve_action(
+                    PlayerAction::Move(direction),
+                    all_entities,
+                    config,
+                    log_tx,
+                );
+            }
+
+            // This is a little tricky lets be honest
+            // I think I would just do easiest possible approach and move to the neighbour hex which reduces the distance the most
+            PlayerAction::GoTowards(log_body, markers) => {
+                let mut rng = rand::rng();
+
+                // Do we have a valid hex?
+                let Some(my_hex) = self.attributes.hex else {
+                    warn!("Attempted to search for adjacent entities but player has no hex");
+                    return PlayerActionResult::NoEffect;
+                };
+
+                // Is the current hex such a hex?
+                let current_hex_valid = all_entities.iter().any(|e| {
+                    e.attributes.hex.is_some()
+                        && e.attributes.hex == Some(my_hex)
+                        && markers.iter().any(|m| e.markers.contains(m))
+                });
+
+                if current_hex_valid {
+                    return PlayerActionResult::NoEffect;
+                }
+
+                // If not, pull all applicable entities
+                let target_entities = all_entities
+                    .iter()
+                    .filter(|e| markers.iter().any(|m| e.markers.contains(m)))
+                    .collect_vec();
+
+                // If no relevant entities, we cant do anything
+                if target_entities.is_empty() {
+                    return PlayerActionResult::NoEffect;
+                }
+
+                // Now sort the target entities by distance
+                let target_entity = target_entities
+                    .iter()
+                    .min_by_key(|e| e.attributes.hex.unwrap().dist_to(my_hex))
+                    .unwrap();
+                let target_hex = target_entity.attributes.hex.unwrap();
+
+                // Next, find our adjacent hex which is closest to the target hex
+                let adjacent_hex = my_hex
+                    .neighbours()
+                    .into_iter()
+                    .filter(|h| h.within_bounds(config.world_radius as isize))
+                    .min_by_key(|h| h.dist_to(target_hex))
+                    .unwrap();
+
+                // Emit log
+                log_tx
+                    .send(GameLog::entity(self, log_body.clone()))
+                    .unwrap();
+
+                // And travel towards that
+                let direction = AxialHexDirection::direction_to(my_hex, adjacent_hex).unwrap();
+                return self.resolve_action(
+                    PlayerAction::Move(direction),
+                    all_entities,
+                    config,
+                    log_tx,
+                );
             }
 
             // Indicating a high motivator value
@@ -228,7 +366,10 @@ impl Entity {
                 return PlayerActionResult::NoEffect;
             }
 
-            PlayerAction::ConsumeFood => {
+            PlayerAction::ConsumeFood {
+                try_dubious,
+                try_morally_wrong,
+            } => {
                 // Is there food at this location?
                 let mut rng = rand::rng();
                 let food_entities = all_entities
@@ -236,7 +377,22 @@ impl Entity {
                     .filter(|e| {
                         e.attributes.hex.is_some() && e.attributes.hex == self.attributes.hex
                     })
-                    .filter(|e| e.attributes.food.is_some());
+                    .filter(|e| match e.attributes.food {
+                        // Is it food at all?
+                        None => false,
+
+                        // Is it food but dubious?
+                        Some(EntityFood {
+                            poison,
+                            morally_wrong,
+                            ..
+                        }) if poison > 0.0 => {
+                            *try_dubious && (!morally_wrong || *try_morally_wrong)
+                        }
+
+                        // Good food
+                        Some(EntityFood { .. }) => true,
+                    });
                 let Some(food_entity) = food_entities.choose(&mut rng) else {
                     return PlayerActionResult::NoEffect;
                 };
@@ -245,7 +401,19 @@ impl Entity {
                 let food = food_entity.attributes.food.as_ref().unwrap();
                 self.attributes
                     .motivators
-                    .reduce_by::<motivator::Hunger>(food.sustenance);
+                    .reduce_by::<motivator::Hunger>(food.sustenance.min(0.1));
+
+                // is this morally wrong, hesitate for a second (send log before the eat log)
+                if food.morally_wrong {
+                    // TODO: maybe chance to bail based on a stat
+                    log_tx
+                        .send(GameLog::entity_pair(
+                            self,
+                            food_entity,
+                            GameLogBody::EntityHesitateBeforeConsume,
+                        ))
+                        .unwrap();
+                }
 
                 // emit log
                 log_tx
@@ -258,7 +426,9 @@ impl Entity {
 
                 // was it poisonous
                 if food.sustenance < 0.0 {
-                    self.attributes.motivators.bump::<motivator::Sickness>();
+                    self.attributes
+                        .motivators
+                        .bump_scaled::<motivator::Sickness>(food.sustenance);
 
                     log_tx
                         .send(GameLog::entity_pair(
@@ -333,14 +503,6 @@ impl Entity {
                 }
 
                 return PlayerActionResult::Ok;
-            }
-
-            PlayerAction::HungerPangs => {
-                self.attributes.motivators.bump::<motivator::Hurt>();
-            }
-
-            PlayerAction::ThirstPangs => {
-                self.attributes.motivators.bump::<motivator::Hurt>();
             }
 
             // Moving in a given hex direction

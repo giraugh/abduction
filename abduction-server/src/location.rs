@@ -8,7 +8,8 @@ use rand::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    entity::{Entity, EntityAttributes, EntityLocation},
+    create_markers,
+    entity::{Entity, EntityAttributes, EntityLocation, EntityMarker},
     hex::AxialHex,
     prop::PropGenerator,
 };
@@ -70,6 +71,17 @@ pub enum LocationKind {
 
 // Generation controls
 impl LocationKind {
+    pub fn markers(&self) -> Vec<EntityMarker> {
+        match self {
+            LocationKind::Plain => vec![],
+            LocationKind::Forest => create_markers!(LushLocation),
+            LocationKind::Lake => create_markers!(LowLyingLocation, LushLocation),
+            LocationKind::Hill => vec![],
+            LocationKind::Mountain => vec![],
+            LocationKind::SmallHut => vec![],
+        }
+    }
+
     pub fn max_of_kind(&self) -> usize {
         match self {
             LocationKind::Plain => 9999,
@@ -103,23 +115,35 @@ impl LocationKind {
         }
     }
 
-    /// Optionally, a location can be associated with prop generators which can generate props in this location type
+    /// Optionally, a location can be associated with prop
+    /// generators which can generate props in this location type
     pub fn prop_generators(&self) -> LocPropGenerators {
         use PropGenerator::*;
         match self {
-            LocationKind::Plain => LocPropGenerators::default().with_optional(NaturalFood),
+            // Plains are pretty barren
+            LocationKind::Plain => LocPropGenerators::none(),
+
+            // Hills have food but not water
             LocationKind::Hill => LocPropGenerators::default().with_optional(NaturalFood),
+
+            // Forests are lush with lots of food and water
             LocationKind::Forest => LocPropGenerators::default()
                 .with_optional(PossiblyPoisonousFood)
                 .with_optional(NaturalFood)
                 .with_optional(QualityNaturalWaterSource)
                 .with_optional(DubiousNaturalWaterSource),
+
+            // Lakes always generate a lake water source and also food in the form of fish
             LocationKind::Lake => LocPropGenerators::default()
                 .with_required(Lake)
                 .with_optional(Fish),
+
+            // Mountiains are pretty barren but can have a mountain lake
             LocationKind::Mountain => {
                 LocPropGenerators::default().with_optional(QualityNaturalWaterSource)
             }
+
+            // Small Hut is a WIP
             LocationKind::SmallHut => LocPropGenerators::none(),
         }
     }
@@ -194,18 +218,17 @@ pub fn generate_locations_for_world(world_radius: isize, biome: Biome) -> Vec<En
         loc_entities.push(Entity {
             entity_id: Entity::id(),
             name: format!("{loc_kind:?}"), // TODO; impl display or have like a set of possible names or soemthing?
-            markers: vec![],
-            relations: vec![],
+            markers: loc_kind.markers(),
             attributes: EntityAttributes {
                 hex: Some(*hex),
+                display_color_hue: Some(loc_kind.temp_hue()),
                 location: Some(EntityLocation {
                     location_kind: loc_kind,
                 }),
 
-                display_color_hue: Some(loc_kind.temp_hue()),
-
                 ..Default::default()
             },
+            ..Default::default()
         });
     });
 

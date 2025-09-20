@@ -26,8 +26,8 @@ use tracing::info;
 use crate::{
     entity::{
         brain::{PlayerActionResult, PlayerActionSideEffect},
-        motivator, Entity, EntityAttributes, EntityHazard, EntityManager, EntityManagerMutation,
-        EntityMarker,
+        motivator, Entity, EntityAttributes, EntityFood, EntityHazard, EntityManager,
+        EntityManagerMutation, EntityMarker,
     },
     has_markers,
     hex::AxialHex,
@@ -196,7 +196,7 @@ impl MatchManager {
                                 .remove_entity(&player.entity_id)
                                 .unwrap();
 
-                            // TODO: add a corpse
+                            // Add a corpse
                             self.match_entities
                                 .upsert_entity(Entity {
                                     entity_id: Entity::id(),
@@ -205,6 +205,10 @@ impl MatchManager {
                                     attributes: EntityAttributes {
                                         hex: player.attributes.hex,
                                         corpse: Some(player.entity_id),
+                                        food: Some(EntityFood {
+                                            morally_wrong: true,
+                                            ..EntityFood::dubious(&mut rng)
+                                        }),
                                         ..Default::default()
                                     },
                                     ..Default::default()
@@ -273,8 +277,31 @@ impl MatchManager {
             return;
         }
 
-        // Maybe they are just hungry/thirsty?
+        // Is there a water source at their location? They can fall in and get wet
+        // TODO: maybe this is based on some kind of clumsiness stat?
         if rng.random_bool(0.01) {
+            if let Some(water_source_entity) = self.match_entities.get_all_entities().find(|e| {
+                e.attributes.water_source.is_some() && e.attributes.hex == player.attributes.hex
+            }) {
+                // Emit log
+                log_tx
+                    .send(GameLog::entity_pair(
+                        player,
+                        water_source_entity,
+                        GameLogBody::EntityFellInWaterSource,
+                    ))
+                    .unwrap();
+
+                // Up saturation
+                player
+                    .attributes
+                    .motivators
+                    .bump_scaled::<motivator::Saturation>(2.0);
+            }
+        }
+
+        // Maybe they are just hungry/thirsty?
+        if rng.random_bool(0.02) {
             // TODO: slowly tune this
             if rng.random_bool(0.5) {
                 player.attributes.motivators.bump::<motivator::Hunger>();

@@ -15,6 +15,8 @@ use serde::{Deserialize, Serialize};
     Hash,
     derive_more::Add,
     derive_more::AddAssign,
+    derive_more::Sub,
+    derive_more::SubAssign,
     derive_more::From,
     derive_more::Into,
 )]
@@ -41,6 +43,11 @@ impl AxialHex {
             }
         }
         result
+    }
+
+    /// Determine if a given hex is adjacent to this hex
+    pub fn is_adjacent(&self, other: AxialHex) -> bool {
+        self.neighbours().contains(&other)
     }
 
     /// Return all neighbouring hexes
@@ -76,6 +83,13 @@ impl AxialHex {
         (q.abs() + r.abs() + s.abs()) / 2 // TODO: do we lose too much accuracy here?
     }
 
+    pub fn dist_to(&self, other: Self) -> isize {
+        let delta = other - *self;
+        let dq = delta.0.abs();
+        let dr = delta.1.abs();
+        (dq + dr + (dq + dr).abs()) / 2
+    }
+
     pub fn within_bounds(&self, radius: isize) -> bool {
         self.dist_to_origin() <= radius
     }
@@ -95,6 +109,29 @@ pub enum AxialHexDirection {
     NorthWest,
     SouthEast,
     SouthWest,
+}
+
+impl AxialHexDirection {
+    /// NOTE: right now this only works with adjacent hexs and returns None in other cases
+    pub fn direction_to(from: AxialHex, to: AxialHex) -> Option<Self> {
+        let delta = to - from;
+
+        match delta {
+            // Same hex
+            AxialHex::ZERO => None,
+
+            // Each direction
+            AxialHex::EAST => Some(AxialHexDirection::East),
+            AxialHex::WEST => Some(AxialHexDirection::West),
+            AxialHex::NORTH_EAST => Some(AxialHexDirection::NorthEast),
+            AxialHex::NORTH_WEST => Some(AxialHexDirection::NorthWest),
+            AxialHex::SOUTH_EAST => Some(AxialHexDirection::SouthEast),
+            AxialHex::SOUTH_WEST => Some(AxialHexDirection::SouthWest),
+
+            // Non-Adjacent
+            _ => None,
+        }
+    }
 }
 
 impl From<AxialHexDirection> for AxialHex {

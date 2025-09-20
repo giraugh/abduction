@@ -33,7 +33,8 @@ function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverit
 				hurt: `${name} winces in pain`,
 				thirst: `${name} licks their dry lips`,
 				sickness: `${name} looks pale`,
-				tiredness: `${name} yawns`
+				tiredness: `${name} yawns`,
+				saturation: `${name} has water dripping off of them`
 			} satisfies Record<MotivatorKey, string>
 		)[motivator];
 	}
@@ -46,7 +47,8 @@ function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverit
 				hurt: `${name} groans in pain`,
 				thirst: `${name} coughs dryly`,
 				sickness: `${name} vomits`,
-				tiredness: `${name} is falling asleep`
+				tiredness: `${name} is falling asleep`,
+				saturation: `${name} looks absolutely drenched`
 			} satisfies Record<MotivatorKey, string>
 		)[motivator];
 	}
@@ -72,7 +74,7 @@ export function logMessage(log: GameLog, game: Game) {
 	}
 
 	if (log.kind === 'entity_drink_from') {
-		return `${primaryName} drank from ${secondaryName}`;
+		return `${primaryName} drank from the ${secondaryName}`;
 	}
 
 	if (log.kind === 'entity_motivator_bark') {
@@ -98,6 +100,22 @@ export function logMessage(log: GameLog, game: Game) {
 
 	if (log.kind === 'entity_stop_sleeping') {
 		return `${primaryName} wakes up`;
+	}
+
+	if (log.kind === 'entity_go_downhill') {
+		return `${primaryName} is heading downhill`;
+	}
+
+	if (log.kind === 'entity_go_to_adjacent_lush') {
+		return `${primaryName} spotted a lush location nearby`;
+	}
+
+	if (log.kind === 'entity_fell_in_water_source') {
+		return `${primaryName} fell into the ${secondaryName}`;
+	}
+
+	if (log.kind === 'entity_hesitate_before_consume') {
+		return `${primaryName} goes to eat ${secondaryName}, but hesitates for a second`;
 	}
 
 	if (log.kind === 'entity_complain_about_taste') {

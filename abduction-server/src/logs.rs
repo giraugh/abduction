@@ -60,6 +60,15 @@ pub enum GameLogBody {
         motivator: MotivatorKey,
     },
 
+    /// Entity heading for low-lying area
+    EntityGoDownhill,
+
+    /// Entity heading to adjacent lush looking location
+    EntityGoToAdjacentLush,
+
+    /// Entity fell into a water source and got saturated
+    EntityFellInWaterSource,
+
     /// Entity consumed some food or drank some water that turned out to be low quality
     /// and caused sickness
     EntityComplainAboutTaste,
@@ -75,6 +84,9 @@ pub enum GameLogBody {
 
     /// The primary entity stops sleeping
     EntityStopSleeping,
+
+    /// The primary entity hesitates before eating the secondary entity
+    EntityHesitateBeforeConsume,
 
     /// The primary entity consumed the secondary entity
     EntityConsume,
