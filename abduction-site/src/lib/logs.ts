@@ -140,4 +140,8 @@ export function logMessage(log: GameLog, game: Game) {
 	if (log.kind === 'entity_saturated_because_of_rain') {
 		return `${primaryName} is getting thoroughly rained on`;
 	}
+
+	if (log.kind === 'entity_hit_by_lightning') {
+		return `${primaryName} was struck by lightning!`;
+	}
 }

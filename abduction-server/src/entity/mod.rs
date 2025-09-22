@@ -46,6 +46,10 @@ pub enum EntityMarker {
     /// Whether the player escaped on the ship
     /// Maybe remove this later
     Escaped,
+
+    /// This entity represents a fire
+    /// which can spread and be put-out
+    Fire,
 }
 
 pub type EntityId = String; // TODO: use a uuid
@@ -269,7 +273,7 @@ macro_rules! create_markers {
 macro_rules! has_markers {
     ($e: expr, $marker: expr) => {{
         use $crate::entity::EntityMarker::*;
-        ($e).markers.contains(&$marker)
+        ($e).markers.contains(&($marker))
     }};
     ($e: expr, $marker: expr, $($markers: expr),+) => {{
         use $crate::entity::EntityMarker::*;

@@ -139,13 +139,13 @@ impl WeatherKind {
             LightWind => vec![
                 (LightWind, 5),
                 (Overcast, 5),
-                (Hurricane, 3),
-                (LightningStorm, 1),
+                (Hurricane, 1),
+                // (LightningStorm, 1),
                 (LightRain, 2),
             ],
             Hurricane => vec![(Hurricane, 5), (LightWind, 5), (LightningStorm, 2)],
-            LightRain => vec![(LightRain, 5), (HeavyRain, 5), (LightningStorm, 1)],
-            HeavyRain => vec![(HeavyRain, 5), (LightRain, 5), (LightningStorm, 4)],
+            LightRain => vec![(LightRain, 5), (HeavyRain, 4)],
+            HeavyRain => vec![(HeavyRain, 5), (LightRain, 5), (LightningStorm, 2)],
             LightningStorm => vec![(LightningStorm, 5), (HeavyRain, 5)],
         }
     }

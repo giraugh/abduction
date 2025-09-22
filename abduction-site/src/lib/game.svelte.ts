@@ -61,6 +61,15 @@ export class Game {
 		});
 	}
 
+	/* Load initial state of entities */
+	loadEntities(entities: Entity[]) {
+		game.loaded = true;
+		for (const entity of entities) {
+			this.entities.set(entity.entity_id, entity);
+			this.entityUpdateHandlers.forEach((h) => h(entity));
+		}
+	}
+
 	processEvent(event: TickEvent) {
 		if (event.kind === 'start_of_match') {
 			// For now, just reload the page, as we need to do a full reset anyway

@@ -363,14 +363,16 @@ impl MotivatorBehaviour for Saturation {
             // Complain about being wet
             actions.push((15, PlayerAction::Bark(motivation, MotivatorKey::Saturation)));
 
+            // Just slowly become dry
+            actions.push((10, PlayerAction::ReduceMotivator(MotivatorKey::Saturation)));
+        }
+
+        if motivation > 0.1 {
             // Maybe get sick
             actions.push((
                 if motivation > 0.5 { 10 } else { 20 },
                 PlayerAction::BumpMotivator(MotivatorKey::Sickness),
             ));
-
-            // Just slowly become dry
-            actions.push((10, PlayerAction::ReduceMotivator(MotivatorKey::Saturation)));
         }
 
         actions

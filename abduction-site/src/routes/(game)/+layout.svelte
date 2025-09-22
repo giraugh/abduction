@@ -18,11 +18,8 @@
 		// Get the current state of all entities
 		client.get_entity_states.query().then((states) => {
 			if (states) {
-				game.loaded = true;
 				game.waitingForStart = false;
-				for (const entity of states) {
-					game.entities.set(entity.entity_id, entity);
-				}
+				game.loadEntities(states);
 			} else {
 				// TODO: hmm, should prob just go somewhere to poll
 				game.waitingForStart = true;

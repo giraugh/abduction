@@ -3,6 +3,7 @@
 	import { axialHexRange, axialToPixel, entityColor, HEX_SIZE, hexagonPoints } from '$lib/display';
 	import { game } from '$lib/game.svelte';
 	import { capitalize, pluralize } from '@giraugh/tools';
+	import { onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	type Focus = { kind: 'entity'; entityId: string } | { kind: 'hex'; hex: [number, number] } | null;
@@ -64,26 +65,29 @@
 	//   and track which index each player is
 	// - then lay out the players at equal fractions of a circle, based on the count
 
-	let playerPositions = new SvelteMap<string, [number, number]>();
-	let playerJitter = new SvelteMap<string, [number, number]>();
-	$effect(() =>
-		game.onUpdate((e) => {
-			if (e.markers.includes('player')) {
-				if (e.attributes.hex) {
-					playerPositions.set(e.entity_id, e.attributes.hex);
-				}
-
-				if (!playerJitter.has(e.entity_id)) {
-					playerJitter.set(e.entity_id, randomJitter());
-				}
+	// We track the positions of entities which should be shown on the map
+	let entityPositions = new SvelteMap<string, [number, number]>();
+	let entityJitter = new SvelteMap<string, [number, number]>();
+	function updateEntityPosition(e: Entity) {
+		if (e.markers.includes('default_inspectable')) {
+			if (e.attributes.hex) {
+				entityPositions.set(e.entity_id, e.attributes.hex);
 			}
-		})
-	);
+
+			if (!entityJitter.has(e.entity_id)) {
+				entityJitter.set(e.entity_id, randomJitter());
+			}
+		}
+	}
+	onMount(() => {
+		game.entities.forEach(updateEntityPosition);
+	});
+	$effect(() => game.onUpdate(updateEntityPosition));
 
 	const hexCounts = $derived.by(() => {
 		return game.entities
 			.values()
-			.filter((e) => e.markers.includes('player') && e.attributes.hex !== null)
+			.filter((e) => e.markers.includes('default_inspectable') && e.attributes.hex !== null)
 			.map((e) => e.attributes.hex!)
 			.map((h) => `${h[0]}:${h[1]}`)
 			.reduce(
@@ -125,10 +129,10 @@
 				(e) => e.attributes.location !== undefined
 			)}
 
-			<!-- Then render the players as dots -->
-			{#each playerPositions.entries() as [entityId, hex] (entityId)}
+			<!-- Then render entities as dots -->
+			{#each entityPositions.entries() as [entityId, hex] (entityId)}
 				{@const entity = game.entities.get(entityId)}
-				{@const jitter = playerJitter.get(entityId)}
+				{@const jitter = entityJitter.get(entityId)}
 				{@const sharing = hexCounts[`${hex[0]}:${hex[1]}`] > 1}
 				{#if hex && entity && jitter}
 					{@const [cx, cy] = axialToPixel(hex)}
@@ -142,7 +146,7 @@
 								focus = { kind: 'entity', entityId };
 							}
 						}}
-						class="player-circle"
+						class="entity-circle"
 						class:focused={focusedEntityId === entityId}
 						r="0.5"
 						cx={(sharing ? jitter[0] : 0) + cx}
@@ -219,6 +223,7 @@
 				<div class="markers">
 					{entity.markers.join(' ')}
 				</div>
+				<h3>Attributes</h3>
 				<table class="attribute-table">
 					<tbody>
 						{#if entity.attributes.age !== undefined}
@@ -243,6 +248,10 @@
 						{/each}
 					</tbody>
 				</table>
+				<h3>Full Entity</h3>
+				<pre class="full-details"><code>
+{JSON.stringify(entity, null, 2)}
+				</code></pre>
 			{/if}
 		{/if}
 	</div>
@@ -284,7 +293,7 @@
 	.wrapper {
 		width: 100%;
 		display: flex;
-		align-items: center;
+		align-items: start;
 		justify-content: center;
 		flex: 1;
 		align-self: stretch;
@@ -312,7 +321,7 @@
 		opacity: 0.2;
 	}
 
-	.player-circle {
+	.entity-circle {
 		transition:
 			cx 0.3s,
 			cy 0.3s;
@@ -357,6 +366,15 @@
 				color: #888;
 			}
 		}
+	}
+
+	.full-details {
+		width: 100%;
+		border: 3px solid #555;
+		border-collapse: collapse;
+		padding: 1em;
+		overflow-x: auto;
+		box-sizing: border-box;
 	}
 
 	.attribute-table {

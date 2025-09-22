@@ -78,6 +78,9 @@ pub enum GameLogBody {
         motivator: MotivatorKey,
     },
 
+    /// Primary entity was hit by lightning
+    EntityHitByLightning,
+
     /// Entity is getting cold because they are exposed at night
     EntityColdBecauseOfTime,
 
