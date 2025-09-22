@@ -36,7 +36,7 @@ pub enum PlayerAction {
     ///  to some being at current location
     TalkWithBeing {
         /// Also talk to e.g animals?
-        try_non_player: bool,
+        try_non_human: bool,
     },
 
     /// Travel towards (the nearest?) hex which has an entity with any of the given markers
@@ -548,7 +548,9 @@ impl Entity {
                 return PlayerActionResult::Ok;
             }
 
-            PlayerAction::TalkWithBeing { try_non_player } => {
+            PlayerAction::TalkWithBeing {
+                try_non_human: try_non_player,
+            } => {
                 let being_entities = all_entities
                     .iter()
                     .filter(|e| {
@@ -556,18 +558,16 @@ impl Entity {
                             && e.attributes.hex == self.attributes.hex
                             && e.entity_id != self.entity_id
                     })
-                    .filter(
-                        |e| match (has_markers!(e, Player), has_markers!(e, Being)) {
-                            // If its a player, always yes
-                            (true, _) => true,
+                    .filter(|e| match (has_markers!(e, Human), has_markers!(e, Being)) {
+                        // If its a human, always yes
+                        (true, _) => true,
 
-                            // Otherwise, if we are okay w/ non players then yes
-                            (_, true) => *try_non_player,
+                        // Otherwise, if we are okay w/ non players then yes
+                        (_, true) => *try_non_player,
 
-                            // Otherwise don't talk with it
-                            _ => false,
-                        },
-                    );
+                        // Otherwise don't talk with it
+                        _ => false,
+                    });
 
                 // If no applicable being, there's no effect
                 let mut rng = rand::rng();

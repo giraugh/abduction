@@ -489,7 +489,7 @@ impl MotivatorBehaviour for Friendliness {
                 10,
                 PlayerAction::Sequential(seq!(
                     PlayerAction::TalkWithBeing {
-                        try_non_player: motivation > 0.9
+                        try_non_human: motivation > 0.9
                     },
                     PlayerAction::GoToAdjacent(
                         GameLogBody::EntityTrackBeing,

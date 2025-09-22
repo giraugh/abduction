@@ -42,6 +42,9 @@ pub enum EntityMarker {
     /// typically but not necessarily implies it has available water (e.g a lake)
     LowLyingLocation,
 
+    /// A being that is a human
+    Human,
+
     /// Something alive
     Being,
 
