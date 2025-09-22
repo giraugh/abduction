@@ -219,11 +219,11 @@ impl MotivatorBehaviour for Hunger {
 
         // The generic plan for finding food
         let seek_food_plan: &[PlayerAction] = &[
-            PlayerAction::Bark(motivation, MotivatorKey::Hunger),
             PlayerAction::GoToAdjacent(
                 GameLogBody::EntityGoToAdjacentLush,
                 create_markers!(LushLocation),
             ),
+            PlayerAction::Bark(motivation, MotivatorKey::Hunger),
         ];
 
         // Eat food if we have it, maybe try finding some
@@ -275,7 +275,6 @@ impl MotivatorBehaviour for Thirst {
 
         // The generic plan for finding water
         let seek_water_plan: &[PlayerAction] = &[
-            PlayerAction::Bark(motivation, MotivatorKey::Thirst),
             PlayerAction::GoToAdjacent(
                 GameLogBody::EntityGoToAdjacentLush,
                 create_markers!(LushLocation),
@@ -284,6 +283,7 @@ impl MotivatorBehaviour for Thirst {
                 GameLogBody::EntityGoDownhill,
                 create_markers!(LowLyingLocation),
             ),
+            PlayerAction::Bark(motivation, MotivatorKey::Thirst),
         ];
 
         // Little bit thirsty, start trying to get water

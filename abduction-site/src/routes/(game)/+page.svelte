@@ -69,7 +69,7 @@
 	let entityPositions = new SvelteMap<string, [number, number]>();
 	let entityJitter = new SvelteMap<string, [number, number]>();
 	function updateEntityPosition(e: Entity) {
-		if (e.markers.includes('default_inspectable')) {
+		if (e.markers.includes('inspectable')) {
 			if (e.attributes.hex) {
 				entityPositions.set(e.entity_id, e.attributes.hex);
 			}
@@ -87,7 +87,7 @@
 	const hexCounts = $derived.by(() => {
 		return game.entities
 			.values()
-			.filter((e) => e.markers.includes('default_inspectable') && e.attributes.hex !== null)
+			.filter((e) => e.markers.includes('inspectable') && e.attributes.hex !== null)
 			.map((e) => e.attributes.hex!)
 			.map((h) => `${h[0]}:${h[1]}`)
 			.reduce(
@@ -200,7 +200,7 @@
 					entity.attributes.hex !== undefined &&
 					sameHex(entity.attributes.hex, focusedHex)}
 				{@const isFocusedEntity = focusedEntityId && entity.entity_id === focusedEntityId}
-				{@const canSeeGlobally = entity.markers.includes('default_inspectable') || showAllEntities}
+				{@const canSeeGlobally = entity.markers.includes('inspectable') || showAllEntities}
 				{@const showGlobal = focus?.kind !== 'hex'}
 				{#if showGlobal ? canSeeGlobally : inFocusedHex}
 					<li>

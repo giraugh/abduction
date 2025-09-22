@@ -41,7 +41,7 @@ pub fn generate_player() -> anyhow::Result<Entity> {
 
     // Initialise empty relations and standard set of markers for players
     let relations = Default::default();
-    let markers = create_markers!(Player, DefaultInspectable, Being, Human);
+    let markers = create_markers!(Player, Inspectable, Being, Human);
 
     // Generate some random player attributes
     // (primarily motivators but a few others)

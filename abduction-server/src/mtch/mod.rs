@@ -213,7 +213,7 @@ impl MatchManager {
                             self.match_entities
                                 .upsert_entity(Entity {
                                     entity_id: Entity::id(),
-                                    markers: vec![EntityMarker::DefaultInspectable],
+                                    markers: vec![EntityMarker::Inspectable],
                                     name: format!("Corpse of {}", &player.name),
                                     attributes: EntityAttributes {
                                         hex: player.attributes.hex,
@@ -299,7 +299,7 @@ impl MatchManager {
                 .upsert_entity(Entity {
                     entity_id: Entity::id(),
                     name: "Fire".into(),
-                    markers: create_markers!(Fire, DefaultInspectable),
+                    markers: create_markers!(Fire, Inspectable),
                     attributes: EntityAttributes {
                         hex: Some(AxialHex::random_in_bounds(
                             &mut rng,

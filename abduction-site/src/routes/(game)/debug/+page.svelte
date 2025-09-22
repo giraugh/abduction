@@ -7,7 +7,7 @@
 	<h2>Entities</h2>
 	<ul class="debug-list">
 		{#each game.entities as [entityId, entity] (entityId)}
-			{@const isInspectable = entity.markers.includes('default_inspectable')}
+			{@const isInspectable = entity.markers.includes('inspectable')}
 			<li title={entityId} class:inspectable={isInspectable}>
 				<details>
 					<h3>Markers</h3>

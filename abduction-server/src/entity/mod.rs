@@ -30,8 +30,8 @@ pub enum EntityMarker {
     /// Maybe remove this later
     Player,
 
-    /// Whether this shows in the inspector by default without searching for it
-    DefaultInspectable,
+    /// Whether this shows in the world view by default without searching for it
+    Inspectable,
 
     /// A location which is particularly lush
     /// has a lot of plants etc
