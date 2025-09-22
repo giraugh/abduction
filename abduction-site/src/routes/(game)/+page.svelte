@@ -111,8 +111,22 @@
 	<div class="svg-container">
 		{#if worldState}
 			<div class="world-state-panel">
-				<strong>{worldState.time_of_day}</strong>
-				<strong>{worldState.weather}</strong>
+				<table class="world-state-table">
+					<thead>
+						<tr>
+							<td>Day</td>
+							<td>Time</td>
+							<td>Weather</td>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>{worldState.day}</td>
+							<td>{worldState.time_of_day}</td>
+							<td>{worldState.weather}</td>
+						</tr>
+					</tbody>
+				</table>
 			</div>
 		{/if}
 
@@ -248,6 +262,25 @@
 						{/each}
 					</tbody>
 				</table>
+				<h3>Relationships</h3>
+				<table class="attribute-table">
+					<tbody>
+						{#each Object.entries(entity.relations.associates ?? {}) as [entityId, assoc] (entityId)}
+							{@const name = game.entities.get(entityId)?.name ?? ''}
+							{#if assoc && name}
+								<tr
+									><td
+										><button
+											onclick={() => {
+												focus = { kind: 'entity', entityId };
+											}}>{name}</button
+										></td
+									><td>{Math.round(assoc.bond * 100)}%</td></tr
+								>
+							{/if}
+						{/each}
+					</tbody>
+				</table>
 				<h3>Full Entity</h3>
 				<pre class="full-details"><code>
 {JSON.stringify(entity, null, 2)}
@@ -359,7 +392,10 @@
 
 			&.global {
 				font-weight: bold;
-				padding-block: 1.5em;
+				padding-block: 0.5em;
+				padding-inline: 0.3em;
+				background: #555;
+				margin-block: 0.2em;
 			}
 
 			&:not(.global) {
@@ -392,6 +428,19 @@
 
 		& tr:nth-child(2n) {
 			background: rgba(0.3, 0.3, 0.3, 10%);
+		}
+	}
+
+	.world-state-table {
+		width: 100%;
+		border-collapse: collapse;
+
+		thead {
+			font-weight: bold;
+		}
+
+		& td {
+			padding: 0.5em;
 		}
 	}
 

@@ -466,6 +466,8 @@ impl MatchManager {
         let action = player.get_next_action();
         let result = player.resolve_action(action, all_entities, &self.match_config, log_tx);
 
+        // TODO: perhaps if the resolved action had no effect, I could let them try again N times?
+
         // If the last thing they did had no result, they get bored
         if matches!(result, PlayerActionResult::NoEffect) {
             player

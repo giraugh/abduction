@@ -8,7 +8,7 @@ use std::{io::SeekFrom, os::unix::fs::MetadataExt, path::PathBuf};
 
 use crate::create_markers;
 use crate::entity::motivator::MotivatorTable;
-use crate::entity::{Entity, EntityAttributes, EntityMarker};
+use crate::entity::{Entity, EntityAttributes};
 use crate::hex::AxialHex;
 
 static PLAYER_DATA_DIR: LazyLock<PathBuf> =
@@ -40,13 +40,13 @@ pub fn generate_player() -> anyhow::Result<Entity> {
     // }
 
     // Initialise empty relations and standard set of markers for players
-    let relations: Vec<_> = Vec::new();
+    let relations = Default::default();
     let markers = create_markers!(Player, DefaultInspectable, Being);
 
     // Generate some random player attributes
     // (primarily motivators but a few others)
     let mut attributes = EntityAttributes {
-        motivators: MotivatorTable::random(),
+        motivators: MotivatorTable::initialise(),
         ..Default::default()
     };
 

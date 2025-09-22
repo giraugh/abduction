@@ -3,6 +3,8 @@ pub mod manager;
 pub mod motivator;
 pub mod world;
 
+use std::collections::HashMap;
+
 pub use manager::*;
 
 use rand::Rng;
@@ -101,6 +103,62 @@ pub struct EntityAttributes {
     pub display_color_hue: Option<f32>,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[qubit::ts]
+#[ts(optional_fields)]
+pub struct EntityRelations {
+    associates: Option<HashMap<EntityId, EntityAssociate>>,
+}
+
+impl EntityRelations {
+    pub fn get_associate(&mut self, entity_id: &EntityId) -> Option<&mut EntityAssociate> {
+        self.associates
+            .as_mut()
+            .and_then(|associates| associates.get_mut(entity_id))
+    }
+
+    /// Create a new associate relation if it doesnt exist, otherwise strengthen it
+    /// NOTE: increases by 1% w/ no current cap
+    /// TODO: we prob want the ability to limit the influence of this
+    pub fn increase_associate_bond(&mut self, entity_id: &EntityId) {
+        let associates = self.associates.get_or_insert(Default::default());
+        match associates.entry(entity_id.clone()) {
+            std::collections::hash_map::Entry::Occupied(mut occupied_entry) => {
+                occupied_entry.get_mut().bond += 0.01;
+            }
+            std::collections::hash_map::Entry::Vacant(vacant_entry) => {
+                vacant_entry.insert(EntityAssociate { bond: 0.01 });
+            }
+        }
+    }
+
+    /// Create a new associate relation if it doesnt exist, otherwise lower it
+    /// NOTE: decreases by 1% w/ no current cap
+    pub fn decrease_associate_bond(&mut self, entity_id: &EntityId) {
+        let associates = self.associates.get_or_insert(Default::default());
+        match associates.entry(entity_id.clone()) {
+            std::collections::hash_map::Entry::Occupied(mut occupied_entry) => {
+                occupied_entry.get_mut().bond -= 0.01;
+            }
+            std::collections::hash_map::Entry::Vacant(vacant_entry) => {
+                vacant_entry.insert(EntityAssociate { bond: -0.01 });
+            }
+        }
+    }
+}
+
+/// Someone you've talked to and know of
+/// Bond is between -1 and 1 for the most part
+/// at a bond of 1 or higher, the relation may upgrade into ally etc
+/// negative values indicate dislike
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[qubit::ts]
+pub struct EntityAssociate {
+    bond: f32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[qubit::ts]
 pub struct EntityAsleep {
@@ -182,19 +240,6 @@ impl EntityWaterSource {
     }
 }
 
-/// A type of entity relation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[qubit::ts]
-pub enum RelationKind {
-    Friend,
-    Lover,
-    Child,
-    Ally,
-    Parent,
-    Holding,
-}
-
 /// A full entity including an id
 /// SEE ALSO: `EntityPayload`
 #[derive(Debug, Clone, Serialize, Default)]
@@ -213,7 +258,7 @@ pub struct Entity {
     pub attributes: EntityAttributes,
 
     /// Relations with other entities
-    pub relations: Vec<(RelationKind, EntityId)>,
+    pub relations: EntityRelations,
 }
 
 /// An entity as stored in a payload on an entity_mutation row
@@ -229,7 +274,7 @@ pub struct EntityPayload {
     pub attributes: EntityAttributes,
 
     /// Relations with other entities
-    pub relations: Vec<(RelationKind, EntityId)>,
+    pub relations: EntityRelations,
 }
 
 impl Entity {

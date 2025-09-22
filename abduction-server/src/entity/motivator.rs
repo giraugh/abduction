@@ -37,18 +37,41 @@ pub struct MotivatorData {
     sensitivity: f32,
 }
 
-impl MotivatorData {
-    /// Get a motivator with randomly defined sensitivity
-    pub fn random() -> Self {
-        Self {
-            motivation: 0.0,
-            sensitivity: rng().random_range(0.01..=0.1),
-        }
-    }
+/// How to initialise a motivator?
+pub enum MotivatorInit {
+    /// Motivation at 0 (sensitivity still random)
+    Zero,
+
+    /// Completely random 0-1 motivation
+    #[allow(unused)]
+    Random,
+
+    /// Random 0-1 but split into N levels
+    RandomDiscrete(usize),
 }
 
-pub trait MotivatorTableKey {
+pub trait Motivator {
     const TABLE_KEY: MotivatorKey;
+    const INIT: MotivatorInit;
+
+    fn init() -> MotivatorData {
+        let mut rng = rng();
+        let sensitivity = rng.random_range(0.01..=0.1);
+        match Self::INIT {
+            MotivatorInit::Zero => MotivatorData {
+                sensitivity,
+                motivation: 0.0,
+            },
+            MotivatorInit::Random => MotivatorData {
+                sensitivity,
+                motivation: rng.random_range(0.0..=1.0),
+            },
+            MotivatorInit::RandomDiscrete(n) => MotivatorData {
+                sensitivity,
+                motivation: (rng.random_range(0.0..=1.0) * n as f32).round() / (n as f32),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -56,12 +79,16 @@ pub trait MotivatorTableKey {
 pub struct MotivatorTable(HashMap<MotivatorKey, MotivatorData>);
 
 impl MotivatorTable {
-    pub fn insert<K: MotivatorTableKey>(&mut self, data: MotivatorData) {
+    pub fn insert<K: Motivator>(&mut self, data: MotivatorData) {
         self.0.insert(K::TABLE_KEY, data);
     }
 
+    pub fn get_motivation<K: Motivator>(&self) -> Option<f32> {
+        self.0.get(&K::TABLE_KEY).map(|m| m.motivation)
+    }
+
     /// Increment a motivator by the sensitivity
-    pub fn bump<K: MotivatorTableKey>(&mut self) {
+    pub fn bump<K: Motivator>(&mut self) {
         self.bump_key(K::TABLE_KEY);
     }
 
@@ -75,7 +102,7 @@ impl MotivatorTable {
     }
 
     /// Increment a motivator by the sensitivity (with some scaling factor)
-    pub fn bump_scaled<K: MotivatorTableKey>(&mut self, scale: f32) {
+    pub fn bump_scaled<K: Motivator>(&mut self, scale: f32) {
         if let Some(data) = self.0.get_mut(&K::TABLE_KEY) {
             data.motivation = (data.motivation + data.sensitivity * scale).clamp(0.0, 1.0);
         } else {
@@ -84,7 +111,7 @@ impl MotivatorTable {
     }
 
     /// Clear out a motivation, setting it back to 0
-    pub fn clear<K: MotivatorTableKey>(&mut self) {
+    pub fn clear<K: Motivator>(&mut self) {
         if let Some(data) = self.0.get_mut(&K::TABLE_KEY) {
             data.motivation = 0.0;
         } else {
@@ -93,7 +120,7 @@ impl MotivatorTable {
     }
 
     /// Decrement a motivator by the sensitivity
-    pub fn reduce<K: MotivatorTableKey>(&mut self) {
+    pub fn reduce<K: Motivator>(&mut self) {
         self.reduce_key(K::TABLE_KEY);
     }
 
@@ -107,7 +134,7 @@ impl MotivatorTable {
     }
 
     /// Decrement a motivator by the specified amount
-    pub fn reduce_by<K: MotivatorTableKey>(&mut self, by: f32) {
+    pub fn reduce_by<K: Motivator>(&mut self, by: f32) {
         if let Some(data) = self.0.get_mut(&K::TABLE_KEY) {
             data.motivation = (data.motivation - by).clamp(0.0, 1.0);
         } else {
@@ -117,9 +144,7 @@ impl MotivatorTable {
 }
 
 macro_rules! declare_motivators {
-    ({ $($keys:ident $(:$accessor: ident)?),* }) => {
-
-    //($($keys:ident),*) => {
+    ({ $($keys:ident : $init: expr),* }) => {
         /// Declare the possible motivator keys
         #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
         #[serde(rename_all = "snake_case")]
@@ -131,16 +156,17 @@ macro_rules! declare_motivators {
         // Then declare each struct
         $(
             pub struct $keys;
-            impl MotivatorTableKey for $keys {
+            impl Motivator for $keys {
                 const TABLE_KEY: MotivatorKey = MotivatorKey::$keys;
+                const INIT: MotivatorInit = $init;
             }
         )*
 
         // And create a method which gets a random state for each motivator
         impl MotivatorTable {
-            pub fn random() -> Self {
+            pub fn initialise() -> Self {
                 let mut table = Self::default();
-                $(table.insert::<$keys>(MotivatorData::random());)*
+                $(table.insert::<$keys>($keys::init());)*
                 table
             }
 
@@ -158,17 +184,30 @@ macro_rules! declare_motivators {
                 )*
                 actions
             }
-
-            $($(
-                pub fn $accessor(&mut self) -> &mut MotivatorData {
-                    self.0.get_mut(&MotivatorKey::$keys).expect("Expected motivator $keys to be present")
-                }
-            )?)*
         }
     }
 }
 
-declare_motivators!({ Hunger, Thirst, Boredom, Hurt, Sickness, Tiredness, Saturation, Cold });
+declare_motivators!({
+    // Needs
+    Hunger: MotivatorInit::Zero,
+    Thirst: MotivatorInit::Zero,
+    Boredom: MotivatorInit::Zero,
+    Hurt: MotivatorInit::Zero,
+    Sickness: MotivatorInit::Zero,
+    Tiredness: MotivatorInit::Zero,
+    Saturation: MotivatorInit::Zero,
+    Cold: MotivatorInit::Zero,
+    Sadness: MotivatorInit::Zero,
+
+    // Personality traits that lead to action
+    // Aggresion: Random,
+    // Planning: Random
+    // Exploration: Random
+
+    // TODO: Support a bias here so we can bias towards 33%
+    Friendliness: MotivatorInit::RandomDiscrete(3)
+});
 
 pub trait MotivatorBehaviour {
     fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)>;
@@ -180,11 +219,11 @@ impl MotivatorBehaviour for Hunger {
 
         // The generic plan for finding food
         let seek_food_plan: &[PlayerAction] = &[
+            PlayerAction::Bark(motivation, MotivatorKey::Hunger),
             PlayerAction::GoToAdjacent(
                 GameLogBody::EntityGoToAdjacentLush,
                 create_markers!(LushLocation),
             ),
-            PlayerAction::Bark(motivation, MotivatorKey::Hunger),
         ];
 
         // Eat food if we have it, maybe try finding some
@@ -236,6 +275,7 @@ impl MotivatorBehaviour for Thirst {
 
         // The generic plan for finding water
         let seek_water_plan: &[PlayerAction] = &[
+            PlayerAction::Bark(motivation, MotivatorKey::Thirst),
             PlayerAction::GoToAdjacent(
                 GameLogBody::EntityGoToAdjacentLush,
                 create_markers!(LushLocation),
@@ -244,13 +284,12 @@ impl MotivatorBehaviour for Thirst {
                 GameLogBody::EntityGoDownhill,
                 create_markers!(LowLyingLocation),
             ),
-            PlayerAction::Bark(motivation, MotivatorKey::Thirst),
         ];
 
         // Little bit thirsty, start trying to get water
         if motivation > 0.4 {
             actions.push((
-                10,
+                20,
                 PlayerAction::Sequential(seq![
                     PlayerAction::DrinkFromWaterSource { try_dubious: false }; // Only go in for safe water
                     ..seek_water_plan,
@@ -305,7 +344,8 @@ impl MotivatorBehaviour for Hurt {
         let mut actions = Vec::new();
 
         if motivation > 0.5 {
-            actions.push((5, PlayerAction::Bark(motivation, MotivatorKey::Hurt)))
+            actions.push((5, PlayerAction::Bark(motivation, MotivatorKey::Hurt)));
+            actions.push((2, PlayerAction::BumpMotivator(MotivatorKey::Sadness)));
         }
 
         // If fully "motivated" then die
@@ -393,6 +433,8 @@ impl MotivatorBehaviour for Cold {
                     PlayerAction::ReduceMotivator(MotivatorKey::Cold),
                 ]),
             ));
+
+            actions.push((2, PlayerAction::BumpMotivator(MotivatorKey::Sadness)));
         }
 
         // TODO: more intelligent plans like finding shelter etc
@@ -408,6 +450,61 @@ impl MotivatorBehaviour for Cold {
         // and hurt in the absolute worst case
         if motivation > 0.95 {
             actions.push((5, PlayerAction::BumpMotivator(MotivatorKey::Hurt)));
+        }
+
+        actions
+    }
+}
+
+impl MotivatorBehaviour for Sadness {
+    fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
+        let mut actions = Vec::new();
+
+        if motivation > 0.0 {
+            actions.push((5, PlayerAction::Bark(motivation, MotivatorKey::Sadness)));
+            actions.push((5, PlayerAction::ReduceMotivator(MotivatorKey::Sadness)));
+        }
+
+        actions
+    }
+}
+
+// Here's the idea with friendliness
+// 0% -> actively misanthropic
+// 30% -> will respond if talked to
+// 66% -> will start converstaions
+// 100% -> talks to everything
+impl MotivatorBehaviour for Friendliness {
+    fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
+        let mut actions = Vec::new();
+
+        // IDEAS:
+        // - talk to some random being at location
+        //   > builds up friendliness relation with that entity
+        // - share some resource with a being at location that sufficiently friendly with
+        // - I kind of want a backup action though if thats not possible, what could that be?
+
+        if motivation > 0.6 {
+            actions.push((
+                10,
+                PlayerAction::Sequential(seq!(
+                    PlayerAction::TalkWithBeing {
+                        try_non_player: motivation > 0.9
+                    },
+                    PlayerAction::GoToAdjacent(
+                        GameLogBody::EntityTrackBeing,
+                        create_markers!(Being)
+                    )
+                )),
+            ));
+        }
+
+        // If not friendly, move away from people
+        if motivation < 0.33 {
+            actions.push((
+                10,
+                PlayerAction::MoveAwayFrom(GameLogBody::EntityAvoid, create_markers!(Player)),
+            ));
         }
 
         actions

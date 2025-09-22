@@ -36,7 +36,9 @@ function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverit
 				sickness: `${name} looks pale`,
 				tiredness: `${name} yawns`,
 				saturation: `${name} has water dripping off of them`,
-				cold: `${name} is shivering`
+				cold: `${name} is shivering`,
+				sadness: `${name} is looking glum`,
+				friendliness: 'NA'
 			} satisfies Record<MotivatorKey, string>
 		)[motivator];
 	}
@@ -51,7 +53,9 @@ function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverit
 				sickness: `${name} vomits`,
 				tiredness: `${name} is falling asleep`,
 				saturation: `${name} looks absolutely drenched`,
-				cold: `${name} looks extremely cold`
+				cold: `${name} looks extremely cold`,
+				sadness: `${name} is quietly crying`,
+				friendliness: 'NA'
 			} satisfies Record<MotivatorKey, string>
 		)[motivator];
 	}
@@ -143,5 +147,25 @@ export function logMessage(log: GameLog, game: Game) {
 
 	if (log.kind === 'entity_hit_by_lightning') {
 		return `${primaryName} was struck by lightning!`;
+	}
+
+	if (log.kind === 'entity_talk') {
+		if (log.bond === 0) return `${primaryName} attempts to talk to ${secondaryName}`;
+		else if (log.bond < 0.3) return `${primaryName} talks with ${secondaryName}`;
+		else if (log.bond < 0.6) return `${primaryName} has a chat with ${secondaryName}`;
+		else if (log.bond < 0.9) return `${primaryName} has a discussion with ${secondaryName}`;
+		else return `${primaryName} sits down for a discussion with ${secondaryName}`;
+	}
+
+	if (log.kind === 'entity_track_being') {
+		return `${primaryName} follows some tracks on the ground`;
+	}
+
+	if (log.kind === 'entity_avoid') {
+		return `${primaryName} is avoiding ${secondaryName}`;
+	}
+
+	if (log.kind === 'entity_ignore') {
+		return `${primaryName} ignores ${secondaryName}`;
 	}
 }

@@ -10,12 +10,23 @@ use tokio::sync::broadcast;
 use crate::logs::{GameLog, GameLogBody};
 
 /// Describes current state of the world
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[qubit::ts]
 #[serde(rename_all = "snake_case")]
 pub struct EntityWorld {
     pub time_of_day: TimeOfDay,
     pub weather: WeatherKind,
+    pub day: usize,
+}
+
+impl Default for EntityWorld {
+    fn default() -> Self {
+        Self {
+            day: 1,
+            time_of_day: TimeOfDay::default(),
+            weather: WeatherKind::default(),
+        }
+    }
 }
 
 impl EntityWorld {
@@ -27,6 +38,11 @@ impl EntityWorld {
                 time_of_day: self.time_of_day.clone(),
             }))
             .unwrap();
+
+        // Go to next day
+        if self.time_of_day == TimeOfDay::Morning {
+            self.day += 1;
+        }
 
         // Update weather
         if let Some(next_weather) = self.weather.next_weather(rng) {
@@ -41,7 +57,7 @@ impl EntityWorld {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[qubit::ts]
 #[serde(rename_all = "snake_case")]
 pub enum TimeOfDay {
@@ -74,6 +90,7 @@ impl TimeOfDay {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[qubit::ts]
+#[serde(rename_all = "snake_case")]
 pub enum WeatherKind {
     /// Nice gently sun and clouds - no additional effects
     #[default]

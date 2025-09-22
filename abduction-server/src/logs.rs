@@ -69,6 +69,19 @@ pub enum GameLogBody {
     /// An entity death
     EntityDeath,
 
+    /// Primary entity talks to secondary entity
+    /// Includes the bond between them (0 -> unknown before this, 0.5 -> have talked a few times, 1 -> friendly etc)
+    EntityTalk { bond: f32 },
+
+    /// Primary entity ignores the secondary entity's attempt at discussion/interaction
+    EntityIgnore,
+
+    /// Player is following a beings tracks
+    EntityTrackBeing,
+
+    /// Primary entity is avoiding the secondary entity (because they are misanthropic)
+    EntityAvoid,
+
     /// An entity letting it be known it has a high motivator e.g:
     ///  high boredom -> "John Smith lets out a big yawn"
     ///  high pain -> "John Smith winces in pain"

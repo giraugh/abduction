@@ -11,6 +11,7 @@ use crate::{
         motivator::{self, MotivatorKey},
         Entity, EntityAsleep, EntityFood, EntityId, EntityMarker, EntityWaterSource,
     },
+    has_markers,
     hex::AxialHexDirection,
     logs::{GameLog, GameLogBody},
     mtch::MatchConfig,
@@ -32,6 +33,12 @@ pub enum PlayerAction {
     /// Try each action in the list until one works
     Sequential(Vec<PlayerAction>),
 
+    ///  to some being at current location
+    TalkWithBeing {
+        /// Also talk to e.g animals?
+        try_non_player: bool,
+    },
+
     /// Travel towards (the nearest?) hex which has an entity with any of the given markers
     /// NOTE: if already at such a location, this will do nothing (and cause NoEffect)
     /// NOTE: requires a log that will be emited interstitially if a suitable hex can be found
@@ -41,6 +48,10 @@ pub enum PlayerAction {
     /// NOTE: if already at such a location, this will do nothing (and cause NoEffect)
     /// NOTE: requires a log that will be emited interstitially if a suitable hex can be found
     GoToAdjacent(GameLogBody, Vec<EntityMarker>),
+
+    /// If there is an entity with one of the given tags at current location, player will move elsewhere
+    /// NOTE: requires a log that will be emited interstitially if a suitable hex can be found
+    MoveAwayFrom(GameLogBody, Vec<EntityMarker>),
 
     /// Die and be removed from the game
     Death,
@@ -230,6 +241,38 @@ impl Entity {
                     .unwrap();
 
                 return PlayerActionResult::SideEffect(PlayerActionSideEffect::Death);
+            }
+
+            PlayerAction::MoveAwayFrom(log_body, markers) => {
+                let mut rng = rand::rng();
+
+                // Get entities at my location with that marker
+                let avoid_entities = all_entities
+                    .iter()
+                    .filter(|e| {
+                        e.entity_id != self.entity_id
+                            && e.attributes.hex.is_some()
+                            && e.attributes.hex == self.attributes.hex
+                    })
+                    .filter(|e| markers.iter().any(|m| e.markers.contains(m)))
+                    .collect_vec();
+
+                // Is there at least one? If so choose one at random
+                let Some(avoid_entity) = avoid_entities.choose(&mut rng) else {
+                    return PlayerActionResult::NoEffect;
+                };
+
+                // Emit log
+                log_tx
+                    .send(GameLog::entity_pair(self, avoid_entity, log_body.clone()))
+                    .unwrap();
+
+                // Then move randomly
+                let move_action = PlayerAction::all_movements()
+                    .choose(&mut rng)
+                    .unwrap()
+                    .clone();
+                return self.resolve_action(move_action, all_entities, config, log_tx);
             }
 
             PlayerAction::GoToAdjacent(log_body, markers) => {
@@ -503,6 +546,85 @@ impl Entity {
                 }
 
                 return PlayerActionResult::Ok;
+            }
+
+            PlayerAction::TalkWithBeing { try_non_player } => {
+                let being_entities = all_entities
+                    .iter()
+                    .filter(|e| {
+                        e.attributes.hex.is_some()
+                            && e.attributes.hex == self.attributes.hex
+                            && e.entity_id != self.entity_id
+                    })
+                    .filter(
+                        |e| match (has_markers!(e, Player), has_markers!(e, Being)) {
+                            // If its a player, always yes
+                            (true, _) => true,
+
+                            // Otherwise, if we are okay w/ non players then yes
+                            (_, true) => *try_non_player,
+
+                            // Otherwise don't talk with it
+                            _ => false,
+                        },
+                    );
+
+                // If no applicable being, there's no effect
+                let mut rng = rand::rng();
+                let Some(being_entity) = being_entities.choose(&mut rng) else {
+                    return PlayerActionResult::NoEffect;
+                };
+
+                // TODO: effect should be to create allyship with it potentially
+                // TODO: different logs based on success here, i.e if other entity can speak/ is friendly etc
+
+                // Is there an established association relation?
+                let association_bond_strength = self
+                    .relations
+                    .get_associate(&being_entity.entity_id)
+                    .map(|associate| associate.bond)
+                    .unwrap_or(0.0);
+
+                // Log
+                log_tx
+                    .send(GameLog::entity_pair(
+                        self,
+                        being_entity,
+                        GameLogBody::EntityTalk {
+                            bond: association_bond_strength,
+                        },
+                    ))
+                    .unwrap();
+
+                // If they are unfriendly, this goes differently
+                // NOTE: if they dont have motivators, we assume they are friendly (assuming that animals etc are friendly)
+                // TODO: probably want to have a tag for beings that inverts this assumption (e.g Predator or something)
+                let friendliness = being_entity
+                    .attributes
+                    .motivators
+                    .get_motivation::<motivator::Friendliness>()
+                    .unwrap_or(1.0);
+                if friendliness < 0.33 {
+                    // they ignore us
+                    log_tx
+                        .send(GameLog::entity_pair(
+                            being_entity,
+                            self,
+                            GameLogBody::EntityIgnore,
+                        ))
+                        .unwrap();
+
+                    // And we like them less
+                    self.relations
+                        .decrease_associate_bond(&being_entity.entity_id);
+                } else {
+                    // It went well, we get less sad
+                    self.attributes.motivators.reduce::<motivator::Sadness>();
+
+                    // And we like them more
+                    self.relations
+                        .increase_associate_bond(&being_entity.entity_id);
+                }
             }
 
             // Moving in a given hex direction
