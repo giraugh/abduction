@@ -385,6 +385,10 @@ impl MotivatorBehaviour for Tiredness {
     fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
         let mut actions = Vec::new();
 
+        if motivation > 0.7 {
+            actions.push((10, PlayerAction::Bark(motivation, MotivatorKey::Tiredness)));
+        }
+
         if motivation > 0.8 {
             actions.push((20, PlayerAction::Bark(motivation, MotivatorKey::Tiredness)));
             actions.push((if motivation > 0.95 { 50 } else { 10 }, PlayerAction::Sleep));
@@ -404,10 +408,13 @@ impl MotivatorBehaviour for Saturation {
             actions.push((15, PlayerAction::Bark(motivation, MotivatorKey::Saturation)));
 
             // Just slowly become dry
-            actions.push((10, PlayerAction::ReduceMotivator(MotivatorKey::Saturation)));
+            actions.push((5, PlayerAction::ReduceMotivator(MotivatorKey::Saturation)));
         }
 
         if motivation > 0.1 {
+            // Get more cold
+            actions.push((10, PlayerAction::BumpMotivator(MotivatorKey::Cold)));
+
             // Maybe get sick
             actions.push((
                 if motivation > 0.5 { 10 } else { 20 },
@@ -423,20 +430,6 @@ impl MotivatorBehaviour for Cold {
     fn get_weighted_actions(motivation: f32) -> Vec<(usize, PlayerAction)> {
         let mut actions = Vec::new();
 
-        // You can always just passively recover,
-        // this way a source of cold has to be on-going
-        if motivation > 0.0 {
-            actions.push((
-                2,
-                PlayerAction::Sequential(vec![
-                    PlayerAction::Bark(motivation, MotivatorKey::Cold),
-                    PlayerAction::ReduceMotivator(MotivatorKey::Cold),
-                ]),
-            ));
-
-            actions.push((2, PlayerAction::BumpMotivator(MotivatorKey::Sadness)));
-        }
-
         // TODO: more intelligent plans like finding shelter etc
 
         // The cold just makes you tired for now
@@ -444,6 +437,7 @@ impl MotivatorBehaviour for Cold {
         if motivation > 0.5 {
             actions.push((5, PlayerAction::BumpMotivator(MotivatorKey::Tiredness)));
             actions.push((2, PlayerAction::BumpMotivator(MotivatorKey::Sickness)));
+            actions.push((2, PlayerAction::BumpMotivator(MotivatorKey::Sadness)));
             actions.push((10, PlayerAction::Bark(motivation, MotivatorKey::Cold)));
         }
 

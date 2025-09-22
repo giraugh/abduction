@@ -9,6 +9,7 @@ export type BarkSeverity = 'moderate' | 'severe';
 export function logLevel(log: GameLog) {
 	if (log.involved_entities.length === 0) return 'global';
 	if (log.kind === 'entity_death') return 'global';
+	if (log.kind === 'lightning_strike') return 'global';
 	return 'local';
 }
 
@@ -141,12 +142,20 @@ export function logMessage(log: GameLog, game: Game) {
 		return `${primaryName} shivers in the cold wind`;
 	}
 
+	if (log.kind === 'entity_warm_because_of_time') {
+		return `${primaryName} warms up a bit in the sun`;
+	}
+
 	if (log.kind === 'entity_saturated_because_of_rain') {
 		return `${primaryName} is getting thoroughly rained on`;
 	}
 
 	if (log.kind === 'entity_hit_by_lightning') {
 		return `${primaryName} was struck by lightning!`;
+	}
+
+	if (log.kind === 'lightning_strike') {
+		return `Lightning struck the ground and started a fire!`;
 	}
 
 	if (log.kind === 'entity_talk') {

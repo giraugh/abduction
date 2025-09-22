@@ -138,12 +138,12 @@ impl WeatherKind {
         match self {
             WeatherKind::Lovely => 0.0,
             WeatherKind::Sunny => 0.0,
-            WeatherKind::Overcast => 0.0,
+            WeatherKind::Overcast => 0.2,
             WeatherKind::LightWind => 0.5,
-            WeatherKind::Hurricane => 0.8,
-            WeatherKind::LightRain => 0.0,
-            WeatherKind::HeavyRain => 0.0,
-            WeatherKind::LightningStorm => 1.0,
+            WeatherKind::Hurricane => 1.0,
+            WeatherKind::LightRain => 0.4,
+            WeatherKind::HeavyRain => 0.4,
+            WeatherKind::LightningStorm => 0.9,
         }
     }
 

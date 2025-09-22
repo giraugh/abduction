@@ -295,24 +295,28 @@ impl MatchManager {
         if matches!(current_world_state.weather, WeatherKind::LightningStorm)
             && rng.random_bool(0.05)
         {
-            self.match_entities
-                .upsert_entity(Entity {
-                    entity_id: Entity::id(),
-                    name: "Fire".into(),
-                    markers: create_markers!(Fire, Inspectable),
-                    attributes: EntityAttributes {
-                        hex: Some(AxialHex::random_in_bounds(
-                            &mut rng,
-                            self.match_config.world_radius as isize,
-                        )),
-                        hazard: Some(EntityHazard { damage: 1 }),
-                        ..Default::default()
-                    },
+            let fire_entity = Entity {
+                entity_id: Entity::id(),
+                name: "Fire".into(),
+                markers: create_markers!(Fire, Inspectable),
+                attributes: EntityAttributes {
+                    hex: Some(AxialHex::random_in_bounds(
+                        &mut rng,
+                        self.match_config.world_radius as isize,
+                    )),
+                    hazard: Some(EntityHazard { damage: 1 }),
                     ..Default::default()
-                })
+                },
+                ..Default::default()
+            };
+
+            ctx.log_tx
+                .send(GameLog::entity(&fire_entity, GameLogBody::LightningStrike))
                 .unwrap();
 
-            // TODO: log this
+            self.match_entities
+                .upsert_entity(fire_entity.clone())
+                .unwrap();
         }
 
         // Fire spreading
@@ -404,8 +408,8 @@ impl MatchManager {
             .time_of_day
             .current_temp_as_cold_proc_chance_scale();
         let cold_chance_scale_from_wind = current_world_state.weather.wind_proc_chance_scale();
-        let cold_chance = cold_chance_scale_from_time * cold_chance_scale_from_wind;
-        if rng.random_bool((cold_chance as f64) * 0.1) {
+        let cold_chance = cold_chance_scale_from_time * cold_chance_scale_from_wind * 0.2;
+        if rng.random_bool(cold_chance as f64) {
             // TODO: prob need a way to find shelter or warm up huh
             player.attributes.motivators.bump::<motivator::Cold>();
 
@@ -416,6 +420,30 @@ impl MatchManager {
                     GameLogBody::EntityColdBecauseOfTime,
                 ))
                 .unwrap();
+        }
+
+        // Warm up in the sun?
+        if cold_chance_scale_from_time == 0.0 && rng.random_bool(0.05) {
+            // Check we need to warm up
+            if player
+                .attributes
+                .motivators
+                .get_motivation::<motivator::Cold>()
+                .unwrap_or(0.0)
+                > 0.0
+            {
+                player
+                    .attributes
+                    .motivators
+                    .reduce_by::<motivator::Cold>(0.3);
+
+                log_tx
+                    .send(GameLog::entity(
+                        player,
+                        GameLogBody::EntityWarmBecauseOfTime,
+                    ))
+                    .unwrap();
+            }
         }
 
         // Is it raining?

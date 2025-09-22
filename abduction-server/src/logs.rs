@@ -82,6 +82,9 @@ pub enum GameLogBody {
     /// Primary entity is avoiding the secondary entity (because they are misanthropic)
     EntityAvoid,
 
+    /// Lightning strikes the ground and creates a fire
+    LightningStrike,
+
     /// An entity letting it be known it has a high motivator e.g:
     ///  high boredom -> "John Smith lets out a big yawn"
     ///  high pain -> "John Smith winces in pain"
@@ -93,6 +96,9 @@ pub enum GameLogBody {
 
     /// Primary entity was hit by lightning
     EntityHitByLightning,
+
+    /// Entity is warming up a bit in the sun
+    EntityWarmBecauseOfTime,
 
     /// Entity is getting cold because they are exposed at night
     EntityColdBecauseOfTime,
