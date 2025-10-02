@@ -9,7 +9,7 @@ mod prop;
 
 use axum::routing::get;
 use futures::{Stream, StreamExt};
-use qubit::{handler, Router};
+use qubit::{handler, TypeScript};
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool};
 use std::sync::atomic;
 use std::{env, net::SocketAddr, str::FromStr, sync::Arc};
@@ -113,7 +113,7 @@ async fn main() {
         .init();
 
     // Create a qubit router
-    let router = Router::new()
+    let router = qubit::Router::new()
         .handler(get_entity_states)
         .handler(get_match_config)
         .handler(game_log_stream)
@@ -123,7 +123,8 @@ async fn main() {
     if fs::try_exists("../abduction-site").await.unwrap() {
         info!("Writing ts bindings");
         router
-            .generate_type("../abduction-site/src/lib/api.gen.ts")
+            .as_codegen()
+            .write_type("../abduction-site/src/lib/api.gen.ts", TypeScript::new())
             .expect("Failed to write bindings");
     } else {
         warn!("Skipping writing ts bindings");
@@ -164,7 +165,7 @@ async fn main() {
     };
 
     // Create service and handle
-    let (qubit_service, qubit_handle) = router.into_service(qubit_ctx.clone());
+    let (qubit_service, qubit_handle) = router.as_rpc(qubit_ctx.clone()).into_service();
 
     // Nest into an Axum router
     let axum_router = axum::Router::<()>::new()
