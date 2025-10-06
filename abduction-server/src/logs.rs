@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use crate::{
     entity::{
-        motivator::MotivatorKey,
+        brain::motivator::MotivatorKey,
         world::{TimeOfDay, WeatherKind},
         Entity, EntityId,
     },
@@ -69,9 +69,9 @@ pub enum GameLogBody {
     /// An entity death
     EntityDeath,
 
-    /// Primary entity talks to secondary entity
+    /// Primary entity greets a secondary entity
     /// Includes the bond between them (0 -> unknown before this, 0.5 -> have talked a few times, 1 -> friendly etc)
-    EntityTalk { bond: f32 },
+    EntityGreet { bond: f32 },
 
     /// Primary entity ignores the secondary entity's attempt at discussion/interaction
     EntityIgnore,

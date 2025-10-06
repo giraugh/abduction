@@ -158,12 +158,11 @@ export function logMessage(log: GameLog, game: Game) {
 		return `Lightning struck the ground and started a fire!`;
 	}
 
-	if (log.kind === 'entity_talk') {
-		if (log.bond === 0) return `${primaryName} attempts to talk to ${secondaryName}`;
-		else if (log.bond < 0.3) return `${primaryName} talks with ${secondaryName}`;
-		else if (log.bond < 0.6) return `${primaryName} has a chat with ${secondaryName}`;
-		else if (log.bond < 0.9) return `${primaryName} has a discussion with ${secondaryName}`;
-		else return `${primaryName} sits down for a discussion with ${secondaryName}`;
+	if (log.kind === 'entity_greet') {
+		if (log.bond === 0) return `${primaryName} waves at ${secondaryName}`;
+		else if (log.bond < 0.3) return `${primaryName} nods at ${secondaryName}`;
+		else if (log.bond < 0.6) return `${primaryName} greets ${secondaryName}`;
+		else return `${primaryName} hugs ${secondaryName}`;
 	}
 
 	if (log.kind === 'entity_track_being') {

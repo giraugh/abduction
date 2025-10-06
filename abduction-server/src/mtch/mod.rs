@@ -26,8 +26,10 @@ use tracing::info;
 use crate::{
     create_markers,
     entity::{
-        brain::{PlayerActionResult, PlayerActionSideEffect},
-        motivator,
+        brain::{
+            motivator,
+            player_action::{PlayerActionResult, PlayerActionSideEffect},
+        },
         world::{EntityWorld, WeatherKind},
         Entity, EntityAttributes, EntityFood, EntityHazard, EntityManager, EntityManagerMutation,
         EntityMarker,
@@ -230,6 +232,13 @@ impl MatchManager {
                         }
                         Some(PlayerActionSideEffect::RemoveOther(entity_id)) => {
                             self.match_entities.remove_entity(&entity_id).unwrap();
+                            self.match_entities.upsert_entity(player).unwrap();
+                        }
+                        Some(PlayerActionSideEffect::SetFocus { entity_id, focus }) => {
+                            let mut other_entity =
+                                self.match_entities.get_entity(&entity_id).unwrap();
+                            other_entity.attributes.focus = Some(focus);
+                            self.match_entities.upsert_entity(other_entity).unwrap();
                             self.match_entities.upsert_entity(player).unwrap();
                         }
                         None => {

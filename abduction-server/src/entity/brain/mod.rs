@@ -1,3 +1,8 @@
+pub mod discussion;
+pub mod focus;
+pub mod motivator;
+pub mod player_action;
+
 use itertools::Itertools;
 use rand::{
     distr::{weighted::WeightedIndex, Distribution},
@@ -8,137 +13,27 @@ use tracing::warn;
 
 use crate::{
     entity::{
-        motivator::{self, MotivatorKey},
-        Entity, EntityAsleep, EntityFood, EntityId, EntityMarker, EntityWaterSource,
+        brain::player_action::{PlayerAction, PlayerActionResult, PlayerActionSideEffect},
+        Entity, EntityFood, EntityWaterSource,
     },
     has_markers,
     hex::AxialHexDirection,
     logs::{GameLog, GameLogBody},
     mtch::MatchConfig,
 };
-
-#[derive(Clone, Debug)]
-pub enum PlayerAction {
-    /// No-op
-    /// "<player> twiddles their thumbs" etc
-    /// (This always causes the "NoEffect" result)
-    Nothing,
-
-    /// Increase some motivator by the sensitivity
-    BumpMotivator(MotivatorKey),
-
-    /// Decrease some motivator by the sensitivity
-    ReduceMotivator(MotivatorKey),
-
-    /// Try each action in the list until one works
-    Sequential(Vec<PlayerAction>),
-
-    ///  to some being at current location
-    TalkWithBeing {
-        /// Also talk to e.g animals?
-        try_non_human: bool,
-    },
-
-    /// Travel towards (the nearest?) hex which has an entity with any of the given markers
-    /// NOTE: if already at such a location, this will do nothing (and cause NoEffect)
-    /// NOTE: requires a log that will be emited interstitially if a suitable hex can be found
-    GoTowards(GameLogBody, Vec<EntityMarker>),
-
-    /// Move to an adjacent hex where an entity resides with any of the given markers
-    /// NOTE: if already at such a location, this will do nothing (and cause NoEffect)
-    /// NOTE: requires a log that will be emited interstitially if a suitable hex can be found
-    GoToAdjacent(GameLogBody, Vec<EntityMarker>),
-
-    /// If there is an entity with one of the given tags at current location, player will move elsewhere
-    /// NOTE: requires a log that will be emited interstitially if a suitable hex can be found
-    MoveAwayFrom(GameLogBody, Vec<EntityMarker>),
-
-    /// Die and be removed from the game
-    Death,
-
-    /// Exclaim about a high motivator of some kind
-    Bark(f32, MotivatorKey),
-
-    /// Move to a new hex
-    Move(AxialHexDirection),
-
-    /// Attempt to eat any food entity at current location
-    ConsumeFood {
-        try_dubious: bool,
-        try_morally_wrong: bool,
-    },
-
-    /// Keep sleeping zzzzz
-    Sleep,
-
-    /// Drink from a water source at current location
-    /// (including water that looks bad?)
-    DrinkFromWaterSource { try_dubious: bool },
-}
-
-#[derive(Clone, Debug)]
-pub enum PlayerActionResult {
-    /// Something that happens to the world as a result of player action
-    SideEffect(PlayerActionSideEffect),
-
-    /// Action had no effect
-    /// (e.g try to eat food but there isnt any)
-    NoEffect,
-
-    /// Action succeeded (even if nothing happens)
-    Ok,
-}
-
-impl PlayerActionResult {
-    /// Get the side effect if there is one
-    pub fn side_effect(self) -> Option<PlayerActionSideEffect> {
-        match self {
-            PlayerActionResult::SideEffect(player_action_side_effect) => {
-                Some(player_action_side_effect)
-            }
-            PlayerActionResult::NoEffect => None,
-            PlayerActionResult::Ok => None,
-        }
-    }
-}
-
-/// Something that happens to the world as a result of player action
-#[derive(Clone, Debug)]
-pub enum PlayerActionSideEffect {
-    /// The player itself dies
-    Death,
-
-    /// Remove some other entity (e.g when eating food)
-    RemoveOther(EntityId),
-}
-
-impl PlayerAction {
-    #[inline(always)]
-    pub const fn all_movements() -> &'static [Self] {
-        use PlayerAction::*;
-        &[
-            Move(AxialHexDirection::East),
-            Move(AxialHexDirection::NorthEast),
-            Move(AxialHexDirection::SouthEast),
-            Move(AxialHexDirection::West),
-            Move(AxialHexDirection::NorthWest),
-            Move(AxialHexDirection::SouthWest),
-        ]
-    }
-}
+use focus::PlayerFocus;
 
 impl Entity {
     /// Determine the next action to be taken by an entity
     /// Only applicable for players
     pub fn get_next_action(&self) -> PlayerAction {
-        // Are we asleep? Then only valid action is sleeping
-        // (This is decoupled from tiredness in case we have some other way of causing sleep)
-        if self.attributes.asleep.is_some() {
-            return PlayerAction::Sleep;
-        }
-
         // Get the weighted actions from each motivator
-        let mut action_weights = self.attributes.motivators.get_weighted_actions();
+        let focus = self
+            .attributes
+            .focus
+            .as_ref()
+            .unwrap_or(&PlayerFocus::Unfocused);
+        let mut action_weights = self.attributes.motivators.get_weighted_actions(focus);
 
         // And add a no-op so its always an option
         action_weights.push((1, PlayerAction::Nothing));
@@ -194,13 +89,24 @@ impl Entity {
                 return PlayerActionResult::Ok;
             }
 
+            PlayerAction::Discussion(discussion_action) => {
+                return self.resolve_discussion_action(
+                    discussion_action,
+                    all_entities,
+                    config,
+                    log_tx,
+                )
+            }
+
             PlayerAction::Sleep => {
-                match self.attributes.asleep.clone() {
+                match self.attributes.focus {
                     // If we are alreay sleeping, keep sleeping
-                    Some(asleep) => {
+                    Some(PlayerFocus::Sleeping {
+                        ref mut remaining_turns,
+                    }) => {
                         // Wake up?
-                        if asleep.remaining_turns <= 1 {
-                            self.attributes.asleep = None;
+                        if *remaining_turns <= 1 {
+                            self.attributes.focus = Some(PlayerFocus::Unfocused);
 
                             // Its very beneficial!
                             self.attributes.motivators.clear::<motivator::Tiredness>();
@@ -210,7 +116,7 @@ impl Entity {
                                 .send(GameLog::entity(self, GameLogBody::EntityStopSleeping))
                                 .unwrap();
                         } else {
-                            self.attributes.asleep.as_mut().unwrap().remaining_turns -= 1;
+                            *remaining_turns -= 1;
 
                             log_tx
                                 .send(GameLog::entity(self, GameLogBody::EntityKeepSleeping))
@@ -219,9 +125,8 @@ impl Entity {
                     }
 
                     // Otherwise, start sleeping now
-                    None => {
-                        // TODO: make this based on something ig
-                        self.attributes.asleep = Some(EntityAsleep {
+                    _ => {
+                        self.attributes.focus = Some(PlayerFocus::Sleeping {
                             remaining_turns: 25,
                         });
 
@@ -333,8 +238,6 @@ impl Entity {
             // This is a little tricky lets be honest
             // I think I would just do easiest possible approach and move to the neighbour hex which reduces the distance the most
             PlayerAction::GoTowards(log_body, markers) => {
-                let mut rng = rand::rng();
-
                 // Do we have a valid hex?
                 let Some(my_hex) = self.attributes.hex else {
                     warn!("Attempted to search for adjacent entities but player has no hex");
@@ -400,7 +303,7 @@ impl Entity {
                         self,
                         GameLogBody::EntityMotivatorBark {
                             motivation: *motivation,
-                            motivator: motivator.clone(),
+                            motivator: *motivator,
                         },
                     ))
                     .unwrap();
@@ -548,9 +451,7 @@ impl Entity {
                 return PlayerActionResult::Ok;
             }
 
-            PlayerAction::TalkWithBeing {
-                try_non_human: try_non_player,
-            } => {
+            PlayerAction::TalkWithBeing { try_cannot_respond } => {
                 let being_entities = all_entities
                     .iter()
                     .filter(|e| {
@@ -558,25 +459,24 @@ impl Entity {
                             && e.attributes.hex == self.attributes.hex
                             && e.entity_id != self.entity_id
                     })
-                    .filter(|e| match (has_markers!(e, Human), has_markers!(e, Being)) {
-                        // If its a human, always yes
-                        (true, _) => true,
+                    .filter(
+                        |e| match (has_markers!(e, CanTalk), has_markers!(e, Being)) {
+                            // If its a human, always yes
+                            (true, _) => true,
 
-                        // Otherwise, if we are okay w/ non players then yes
-                        (_, true) => *try_non_player,
+                            // Otherwise, if we are okay w/ non responders then yes
+                            (_, true) => *try_cannot_respond,
 
-                        // Otherwise don't talk with it
-                        _ => false,
-                    });
+                            // Otherwise don't talk with it
+                            _ => false,
+                        },
+                    );
 
                 // If no applicable being, there's no effect
                 let mut rng = rand::rng();
                 let Some(being_entity) = being_entities.choose(&mut rng) else {
                     return PlayerActionResult::NoEffect;
                 };
-
-                // TODO: effect should be to create allyship with it potentially
-                // TODO: different logs based on success here, i.e if other entity can speak/ is friendly etc
 
                 // Is there an established association relation?
                 let association_bond_strength = self
@@ -590,7 +490,7 @@ impl Entity {
                     .send(GameLog::entity_pair(
                         self,
                         being_entity,
-                        GameLogBody::EntityTalk {
+                        GameLogBody::EntityGreet {
                             bond: association_bond_strength,
                         },
                     ))
@@ -618,12 +518,33 @@ impl Entity {
                     self.relations
                         .decrease_associate_bond(&being_entity.entity_id);
                 } else {
-                    // It went well, we get less sad
-                    self.attributes.motivators.reduce::<motivator::Sadness>();
-
-                    // And we like them more
+                    // Just them responding makes us like them
                     self.relations
                         .increase_associate_bond(&being_entity.entity_id);
+
+                    // And if they can respond, we start a chat with them
+                    if has_markers!(being_entity, CanTalk) {
+                        // And we start talking to them
+                        // Initial interest scales w/ bond but has a minimum
+                        // (for simplicity our interest starts the same as theirs in the convo)
+                        let interest =
+                            ((association_bond_strength * 100f32) as usize).clamp(10, 100);
+
+                        // Set our focus
+                        self.attributes.focus = Some(PlayerFocus::Discussion {
+                            with: being_entity.entity_id.clone(),
+                            interest,
+                        });
+
+                        // TODO: maybe there's a strat here where we force them to do a "talk" action w/ us instead
+                        return PlayerActionResult::SideEffect(PlayerActionSideEffect::SetFocus {
+                            entity_id: being_entity.entity_id.clone(),
+                            focus: PlayerFocus::Discussion {
+                                with: self.entity_id.clone(),
+                                interest,
+                            },
+                        });
+                    }
                 }
             }
 

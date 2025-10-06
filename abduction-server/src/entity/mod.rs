@@ -1,6 +1,5 @@
 pub mod brain;
 pub mod manager;
-pub mod motivator;
 pub mod world;
 
 use std::collections::HashMap;
@@ -13,7 +12,7 @@ use serde_with::skip_serializing_none;
 use uuid::Uuid;
 
 use crate::{
-    entity::{motivator::MotivatorTable, world::EntityWorld},
+    entity::{brain::focus::PlayerFocus, brain::motivator::MotivatorTable, world::EntityWorld},
     hex::AxialHex,
     location::LocationKind,
 };
@@ -44,6 +43,9 @@ pub enum EntityMarker {
 
     /// A being that is a human
     Human,
+
+    /// A being that can talk
+    CanTalk,
 
     /// Something alive
     Being,
@@ -94,11 +96,11 @@ pub struct EntityAttributes {
     /// If set, this entity is an infinite water source
     pub water_source: Option<EntityWaterSource>,
 
-    /// Is this entity asleep?
-    pub asleep: Option<EntityAsleep>,
-
     /// The current details of the world
     pub world: Option<EntityWorld>,
+
+    /// Current focus
+    pub focus: Option<PlayerFocus>,
 
     /// A primary hue to use when displaying this entity
     /// The value is a % out of 100 for use in HSL
@@ -160,13 +162,6 @@ impl EntityRelations {
 #[qubit::ts]
 pub struct EntityAssociate {
     bond: f32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[qubit::ts]
-pub struct EntityAsleep {
-    /// How asleep are they?
-    pub remaining_turns: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

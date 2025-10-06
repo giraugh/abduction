@@ -60,6 +60,7 @@ Agent Mechanics
    - Type of relation that assigns tags to another entity
    - Can be shared w/ other entities
    - Used as references when resolving other actions
+   - May not be true i.e can be a rumour
    - e.g
      - Good water source location
      - Person who has infectious disease
