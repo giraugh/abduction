@@ -65,6 +65,9 @@ pub enum PlayerAction {
     /// if not already in a sleep focus, will enter one
     Sleep,
 
+    /// If Sleeping, wake up
+    WakeUp,
+
     /// Drink from a water source at current location
     /// (including water that looks bad?)
     DrinkFromWaterSource { try_dubious: bool },

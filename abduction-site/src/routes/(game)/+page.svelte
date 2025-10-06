@@ -8,6 +8,9 @@
 
 	type Focus = { kind: 'entity'; entityId: string } | { kind: 'hex'; hex: [number, number] } | null;
 
+	/** Motivators which act like statistics */
+	const STATISTIC_LIKE_MOTIVATORS = ['friendliness'];
+
 	let showAllEntities = $state(false);
 
 	let focus = $state<Focus>(null);
@@ -254,11 +257,31 @@
 							>
 						{/if}
 
-						{#each Object.keys(motivators).toSorted() as motivatorKey (motivatorKey)}
+						{#if entity.attributes.focus !== undefined}
+							<tr><td>Focus</td><td>{entity.attributes.focus.kind}</td></tr>
+						{/if}
+
+						{#each Object.entries(motivators).toSorted((a, b) => b[1].motivation - a[1].motivation) as [motivatorKey] (motivatorKey)}
 							{@const key = motivatorKey as MotivatorKey}
 							{@const motivator = motivators[key]!}
 							{@const motivation = Math.floor(motivator.motivation * 100)}
-							<tr><td>{capitalize(motivatorKey)}</td><td>{motivation}%</td></tr>
+							{#if STATISTIC_LIKE_MOTIVATORS.includes(key)}
+								<tr><td>{capitalize(motivatorKey)}</td><td>{motivation}%</td></tr>
+							{/if}
+						{/each}
+					</tbody>
+				</table>
+
+				<h3>Motivators</h3>
+				<table class="attribute-table">
+					<tbody>
+						{#each Object.entries(motivators).toSorted((a, b) => b[1].motivation - a[1].motivation) as [motivatorKey] (motivatorKey)}
+							{@const key = motivatorKey as MotivatorKey}
+							{@const motivator = motivators[key]!}
+							{@const motivation = Math.floor(motivator.motivation * 100)}
+							{#if !STATISTIC_LIKE_MOTIVATORS.includes(key)}
+								<tr><td>{capitalize(motivatorKey)}</td><td>{motivation}%</td></tr>
+							{/if}
 						{/each}
 					</tbody>
 				</table>

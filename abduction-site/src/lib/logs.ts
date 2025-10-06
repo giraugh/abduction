@@ -1,4 +1,4 @@
-import type { AxialHexDirection, GameLog, MotivatorKey } from './api.gen';
+import type { AxialHexDirection, GameLog, MotivatorKey, Topic } from './api.gen';
 import type { Game } from './game.svelte';
 
 /** If global, shows up everywhere, if local only if scoped to the hex/entity */
@@ -24,6 +24,11 @@ function formatDirection(dir: AxialHexDirection) {
 			south_west: 'south west'
 		} satisfies Record<AxialHexDirection, string>
 	)[dir];
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function unsnake(s: string) {
+	return s.replaceAll('_', ' ');
 }
 
 function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverity) {
@@ -60,6 +65,22 @@ function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverit
 			} satisfies Record<MotivatorKey, string>
 		)[motivator];
 	}
+}
+
+function formatChatTopic(topic: Topic): string {
+	return (
+		{
+			alien_situation: 'the aliens',
+			ambitions: 'their life ambitions',
+			career: 'their past career',
+			entertainment: 'a tv show they saw recently',
+			family: 'their family back home',
+			fears: 'their innermost fears',
+			hopes: 'their hopes and dreams',
+			news: 'the current going-ons',
+			weather: 'this weather'
+		} satisfies Record<Topic, string>
+	)[topic];
 }
 
 export function logMessage(log: GameLog, game: Game) {
@@ -163,6 +184,18 @@ export function logMessage(log: GameLog, game: Game) {
 		else if (log.bond < 0.3) return `${primaryName} nods at ${secondaryName}`;
 		else if (log.bond < 0.6) return `${primaryName} greets ${secondaryName}`;
 		else return `${primaryName} hugs ${secondaryName}`;
+	}
+
+	if (log.kind === 'entity_chat') {
+		return `${primaryName} chats with ${secondaryName} about ${formatChatTopic(log.topic)}`;
+	}
+
+	if (log.kind === 'entity_lose_interest') {
+		return `${primaryName} gets distracted from the conversation`;
+	}
+
+	if (log.kind === 'entity_farewell') {
+		return `${primaryName} says farewell to ${secondaryName}`;
 	}
 
 	if (log.kind === 'entity_track_being') {

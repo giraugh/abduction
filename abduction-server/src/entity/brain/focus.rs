@@ -8,7 +8,7 @@ use crate::entity::EntityId;
 /// This is roughly equivalent to the "state" of a player. But note that most state transitions transition via the "unfocused" state,
 /// and it will be common for players to spend long stretches of time w/o a focus.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case")]
 #[qubit::ts]
 #[non_exhaustive]
 pub enum PlayerFocus {

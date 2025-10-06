@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::warn;
 
-use crate::{create_markers, logs::GameLogBody};
+use crate::{create_markers, entity::brain::discussion::DiscussionAction, logs::GameLogBody};
 
 use super::{player_action::PlayerAction, PlayerFocus};
 
@@ -270,6 +270,18 @@ impl MotivatorBehaviour for Hunger {
                     actions.push((20, PlayerAction::BumpMotivator(MotivatorKey::Hurt)));
                 }
             }
+            PlayerFocus::Discussion { .. } => {
+                // Stop talking, im hungry!
+                if motivation > 0.6 {
+                    actions.push((
+                        if motivation > 0.7 { 30 } else { 10 },
+                        PlayerAction::Sequential(seq![
+                            PlayerAction::Bark(motivation, MotivatorKey::Hunger),
+                            PlayerAction::Discussion(DiscussionAction::LoseInterest),
+                        ]),
+                    ));
+                }
+            }
             _ => {}
         }
 
@@ -321,6 +333,18 @@ impl MotivatorBehaviour for Thirst {
 
                 if motivation > 0.9 {
                     actions.push((20, PlayerAction::BumpMotivator(MotivatorKey::Hurt)));
+                }
+            }
+            PlayerFocus::Discussion { .. } => {
+                // Stop talking, im thirsty!
+                if motivation > 0.6 {
+                    actions.push((
+                        if motivation > 0.7 { 30 } else { 10 },
+                        PlayerAction::Sequential(seq![
+                            PlayerAction::Bark(motivation, MotivatorKey::Hunger),
+                            PlayerAction::Discussion(DiscussionAction::LoseInterest),
+                        ]),
+                    ));
                 }
             }
             _ => {}
@@ -488,6 +512,18 @@ impl MotivatorBehaviour for Cold {
                     actions.push((5, PlayerAction::BumpMotivator(MotivatorKey::Hurt)));
                 }
             }
+            PlayerFocus::Sleeping { .. } => {
+                // Hard to sleep if its cold
+                if motivation > 0.7 {
+                    actions.push((
+                        5,
+                        PlayerAction::Sequential(seq![
+                            PlayerAction::Bark(motivation, MotivatorKey::Cold),
+                            PlayerAction::WakeUp,
+                        ]),
+                    ));
+                }
+            }
             _ => {}
         }
 
@@ -556,15 +592,21 @@ impl MotivatorBehaviour for Friendliness {
                     ));
                 }
             }
-            PlayerFocus::Discussion { .. } => {
-                // Ideas
-                // - chat / small-talk
-                // - lose interest
-                // - (high interest / high friendliness) discuss:
-                //   - life
-                //   - family
-                //   - survival
-                // - (low interest) stop talking
+            PlayerFocus::Discussion { interest, .. } => {
+                // For now just chat
+                if motivation > 0.6 {
+                    actions.push((10, PlayerAction::Discussion(DiscussionAction::LightChat)));
+                }
+
+                // or chat about something heavier if more interested & friendly
+                if *interest > 5 && motivation > 0.6 {
+                    actions.push((20, PlayerAction::Discussion(DiscussionAction::HeavyChat)));
+                }
+
+                // And if less friendly, also lose interest potentially
+                if motivation < 0.6 {
+                    actions.push((5, PlayerAction::Discussion(DiscussionAction::LoseInterest)));
+                }
             }
             _ => {}
         }

@@ -368,7 +368,7 @@ impl MatchManager {
                     log_tx
                         .send(GameLog::entity_pair(
                             entity,
-                            player,
+                            &player.entity_id,
                             GameLogBody::HazardHurt,
                         ))
                         .unwrap();

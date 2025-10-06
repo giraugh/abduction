@@ -98,6 +98,25 @@ impl Entity {
                 )
             }
 
+            PlayerAction::WakeUp => {
+                match self.attributes.focus {
+                    // If we are alreay sleeping, keep sleeping
+                    Some(PlayerFocus::Sleeping { .. }) => {
+                        self.attributes.focus = Some(PlayerFocus::Unfocused);
+
+                        // Its very beneficial!
+                        self.attributes.motivators.reduce_by::<motivator::Hurt>(0.2);
+
+                        log_tx
+                            .send(GameLog::entity(self, GameLogBody::EntityStopSleeping))
+                            .unwrap();
+                    }
+                    _ => return PlayerActionResult::NoEffect,
+                }
+
+                return PlayerActionResult::Ok;
+            }
+
             PlayerAction::Sleep => {
                 match self.attributes.focus {
                     // If we are alreay sleeping, keep sleeping
@@ -109,7 +128,6 @@ impl Entity {
                             self.attributes.focus = Some(PlayerFocus::Unfocused);
 
                             // Its very beneficial!
-                            self.attributes.motivators.clear::<motivator::Tiredness>();
                             self.attributes.motivators.reduce_by::<motivator::Hurt>(0.2);
 
                             log_tx
@@ -117,6 +135,12 @@ impl Entity {
                                 .unwrap();
                         } else {
                             *remaining_turns -= 1;
+
+                            // Get less tired
+                            // (this way if we wake up part way, we are still groggy)
+                            self.attributes
+                                .motivators
+                                .reduce_by::<motivator::Tiredness>(0.2);
 
                             log_tx
                                 .send(GameLog::entity(self, GameLogBody::EntityKeepSleeping))
@@ -169,7 +193,7 @@ impl Entity {
 
                 // Emit log
                 log_tx
-                    .send(GameLog::entity_pair(self, avoid_entity, log_body.clone()))
+                    .send(GameLog::entity_pair(self, *avoid_entity, log_body.clone()))
                     .unwrap();
 
                 // Then move randomly
@@ -509,7 +533,7 @@ impl Entity {
                     log_tx
                         .send(GameLog::entity_pair(
                             being_entity,
-                            self,
+                            &self.entity_id,
                             GameLogBody::EntityIgnore,
                         ))
                         .unwrap();
@@ -527,8 +551,9 @@ impl Entity {
                         // And we start talking to them
                         // Initial interest scales w/ bond but has a minimum
                         // (for simplicity our interest starts the same as theirs in the convo)
-                        let interest =
-                            ((association_bond_strength * 100f32) as usize).clamp(10, 100);
+                        let max_interest = 20f32;
+                        let interest = ((association_bond_strength * max_interest) as usize)
+                            .clamp(2, max_interest as usize);
 
                         // Set our focus
                         self.attributes.focus = Some(PlayerFocus::Discussion {

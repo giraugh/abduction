@@ -2,7 +2,10 @@ use serde::Serialize;
 
 use crate::{
     entity::{
-        brain::motivator::MotivatorKey,
+        brain::{
+            discussion::{self, Topic},
+            motivator::MotivatorKey,
+        },
         world::{TimeOfDay, WeatherKind},
         Entity, EntityId,
     },
@@ -44,12 +47,34 @@ impl GameLog {
     }
 
     /// NOTE: uses hex from entity a
-    pub fn entity_pair(entity_a: &Entity, entity_b: &Entity, body: GameLogBody) -> Self {
+    pub fn entity_pair(entity_a: &Entity, entity_b_id: impl AsEntityId, body: GameLogBody) -> Self {
         Self {
             hex: entity_a.attributes.hex,
-            involved_entities: vec![entity_a.entity_id.clone(), entity_b.entity_id.clone()],
+            involved_entities: vec![entity_a.entity_id.clone(), entity_b_id.id().clone()],
             body,
         }
+    }
+}
+
+pub trait AsEntityId {
+    fn id(&self) -> &EntityId;
+}
+
+impl AsEntityId for &EntityId {
+    fn id(&self) -> &EntityId {
+        self
+    }
+}
+
+impl AsEntityId for Entity {
+    fn id(&self) -> &EntityId {
+        &self.entity_id
+    }
+}
+
+impl AsEntityId for &Entity {
+    fn id(&self) -> &EntityId {
+        &self.entity_id
     }
 }
 
@@ -72,6 +97,15 @@ pub enum GameLogBody {
     /// Primary entity greets a secondary entity
     /// Includes the bond between them (0 -> unknown before this, 0.5 -> have talked a few times, 1 -> friendly etc)
     EntityGreet { bond: f32 },
+
+    /// Primary entity says farewell to secondary entity
+    EntityFarewell,
+
+    /// Chatting about some topic
+    EntityChat { topic: discussion::Topic },
+
+    /// Primary entity is losing interest in the discussion
+    EntityLoseInterest,
 
     /// Primary entity ignores the secondary entity's attempt at discussion/interaction
     EntityIgnore,
