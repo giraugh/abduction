@@ -1,38 +1,97 @@
 # Abduction
 
-Plan is that the server simulates a simple mostly text-based survival game and streams it to the site. The sites show whats happening
-on a hex grid w/ event logs from each hex.
+> Aliens are abducting humans and running sick games. Humans are fighting to their death in space in brutal heart-renching games... want to see one?
 
-## TODO
+Abduction is a text based story simulator for survival-games-esque matches featuring a revolving cast of simulated agent players.
+Follow your favourite players as they battle to escape the alien system.
 
-Fun Feature Ideas
-- Day/Night Cycle
-- Weather / Temperature
+## How will this work?
+
+Abduction is still work in progress. When the first season launches you can expect:
+
+- Procedural text-based stories for each player
+- A rotating cast of humans that are changed by every match
+- Shocking unexpected world events, weather and twists
+- A human story that focuses on making friends and persevering just as much as violence and depravity
+- Tools for browsing and inspecting each player, so you can make an informed decision on who gets your favour
+- Site-wide voting to provide advantages (at a cost) to certain players
+
+The schedule is still a bit wip, but here's what I'm thinking so far
+- Each season will run for about a month
+- Pool of about 100 players, with ~15 in each match
+- Games starting every few hours, about 2-3 a day
+
+
+## Work In Progress
+
+Here's my ideation / notes on current game progress.
+
+-----
+
+New Motivators
+ - **Empathy**
+  - Comfort a sad person
+  - Help a hurt person
+  - Grieve for corpse
+ - **Exploration**
+  - Search for something
+    - Water, Food etc
+    - % chance to find it or something else
+ - **Aggression**
+  - If dislike something suitably enough, attack it
+ - **Planning?**
+  - Pick up resources
+  - Establish ally
+  - Ask people for memories
+ - **Disease**
+  - Slowly converts into sickness
+  - Can spread to others
+
+Agent Mechanics
+ - Focus
+   - override default action mechanism for a duration
+   - e.g sleeping, talking, fishing, travelling
+   - represent actions that take multiple ticks
+   - slowly drains "Focus" motivator
+     - limit consecutive focuses
+   - can involve other entities
+     - probably initiated using a side effect?
+ - Memories
+   - Type of relation that assigns tags to another entity
+   - Can be shared w/ other entities
+   - Used as references when resolving other actions
+   - e.g
+     - Good water source location
+     - Person who has infectious disease
+
+Agent Persistence
+ - Want a way for the same "players" to appear in multiple games
+ - Audience can get attached to their favourite characters
+ - Death should still be a way of being eliminated
+   - And it should be possible to be completely eliminated
+ - IDEA:
+   - There is some "entity" that wonders the map and collects corpses
+   - Collected corpses are revived into the next game
+   - Players with corpses that are not collected are lost forever
+     - If they are disintegrated, eaten, exploded etc
+     - If something happens to the collector?
+
+
+Fun Misc Feature Ideas
 - Forming Allies
 - Owning Pets
 - Collecting and Holding Resources
 - Players greeting each other
 - Memories
+- Fire spreading
 
-Websocket Death
+Websocket Updates
 - Resuming websocket when dead
 - Backport this to qubit
 
 Migration Safety
 - When we make certain changes, I want to update some kind of version tag and then force a new game to be deployed when the CI build runs
 - this could quite literally use the rust version and put something in the db
-
-Scheduling games
-  - Detect when a game is finished (one player remains)
-  - Stop that game (emit MatchEnd TickEvent), and somehow schedule the next one
-    - When a game finishes, setup an async task to wake up next day at a given time and start the next match
-    - TODO: add persistence to setup this task when starting the program
-
-Non-game part of client 
-  - Must be able to check if a match is currently running
-  - If not, show when the next game is scheduled for
-  - See the outcome of the previous game
-  - (Later) see the replay (and outcome) of the previous game
 
 Game linking design
   - Do we have one huge week-long game? or roughly one game a day?
