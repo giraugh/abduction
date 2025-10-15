@@ -1,7 +1,9 @@
 pub mod discussion;
+pub mod event;
 pub mod focus;
 pub mod motivator;
 pub mod player_action;
+pub mod signal;
 
 use itertools::Itertools;
 use rand::{
@@ -13,7 +15,10 @@ use tracing::warn;
 
 use crate::{
     entity::{
-        brain::player_action::{PlayerAction, PlayerActionResult, PlayerActionSideEffect},
+        brain::{
+            player_action::{PlayerAction, PlayerActionResult, PlayerActionSideEffect},
+            signal::PlayerActionContext,
+        },
         Entity, EntityFood, EntityWaterSource,
     },
     has_markers,
@@ -27,13 +32,29 @@ impl Entity {
     /// Determine the next action to be taken by an entity
     /// Only applicable for players
     pub fn get_next_action(&self) -> PlayerAction {
-        // Get the weighted actions from each motivator
-        let focus = self
+        // Build the context for acting (WIP)
+        let ctx = PlayerActionContext {
+            focus: self
+                .attributes
+                .focus
+                .as_ref()
+                .cloned()
+                .unwrap_or(PlayerFocus::Unfocused),
+        };
+
+        // Collect signals
+        let signals = self
             .attributes
-            .focus
-            .as_ref()
-            .unwrap_or(&PlayerFocus::Unfocused);
-        let mut action_weights = self.attributes.motivators.get_weighted_actions(focus);
+            .motivators
+            .as_signals()
+            //.chain(other) // TODO: add events
+            .collect_vec();
+
+        // Then resolve them into actions
+        let mut action_weights = signals
+            .iter()
+            .flat_map(|signal| signal.act_on(&ctx))
+            .collect_vec();
 
         // And add a no-op so its always an option
         action_weights.push((1, PlayerAction::Nothing));
