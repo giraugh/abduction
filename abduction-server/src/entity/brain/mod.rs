@@ -1,3 +1,4 @@
+pub mod characteristic;
 pub mod discussion;
 pub mod event;
 pub mod focus;
@@ -16,6 +17,7 @@ use tracing::warn;
 use crate::{
     entity::{
         brain::{
+            characteristic::{Characteristic, CharacteristicStrength},
             player_action::{PlayerAction, PlayerActionResult, PlayerActionSideEffect},
             signal::PlayerActionContext,
         },
@@ -544,12 +546,8 @@ impl Entity {
                 // If they are unfriendly, this goes differently
                 // NOTE: if they dont have motivators, we assume they are friendly (assuming that animals etc are friendly)
                 // TODO: probably want to have a tag for beings that inverts this assumption (e.g Predator or something)
-                let friendliness = being_entity
-                    .attributes
-                    .motivators
-                    .get_motivation::<motivator::Friendliness>()
-                    .unwrap_or(1.0);
-                if friendliness < 0.33 {
+                let friendliness = being_entity.characteristic(Characteristic::Friendliness);
+                if friendliness < CharacteristicStrength::Average {
                     // they ignore us
                     log_tx
                         .send(GameLog::entity_pair(

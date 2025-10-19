@@ -233,6 +233,7 @@
 			{#if entity}
 				{@const loc = entity.attributes.hex ? axialToCompass(entity.attributes.hex) : 'unknown'}
 				{@const motivators = entity.attributes.motivators}
+				{@const characteristics = entity.attributes.characteristics ?? {}}
 				<hr />
 				<h2>
 					{entity.name} <span class="color-dot" style:background={entityColor(entity)}></span>
@@ -272,6 +273,32 @@
 					</tbody>
 				</table>
 
+				<h3>Characteristics</h3>
+				<table class="attribute-table">
+					<tbody>
+						{#each Object.entries(characteristics)
+							.toSorted((a, b) => b[1].charCodeAt() - a[1].charCodeAt())
+							.toReversed() as [characteristic, strength] (characteristic)}
+							<tr>
+								<td>{capitalize(characteristic)}</td>
+								<td
+									class="characteristic-strength"
+									class:high={strength === 'high'}
+									class:low={strength === 'low'}
+								>
+									{#if strength === 'high'}
+										⬆
+									{:else if strength === 'low'}
+										⬇
+									{:else}
+										➡️
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+
 				<h3>Motivators</h3>
 				<table class="attribute-table">
 					<tbody>
@@ -285,6 +312,7 @@
 						{/each}
 					</tbody>
 				</table>
+
 				<h3>Relationships</h3>
 				<table class="attribute-table">
 					<tbody>
@@ -547,5 +575,29 @@
 		transform: translateX(calc(-100% - 1em));
 		top: 1em;
 		width: max-content;
+	}
+
+	.characteristic-strength {
+		font-size: 2.4rem;
+		padding: 0;
+		margin: 0;
+		line-height: 0;
+
+		&.high {
+			color: green;
+		}
+
+		&.low {
+			color: red;
+		}
+	}
+
+	h3:has(+ table) {
+		margin-bottom: 5px;
+		margin-top: 30px;
+		text-transform: uppercase;
+		font-size: 1rem;
+		letter-spacing: 1.2px;
+		opacity: 0.5;
 	}
 </style>

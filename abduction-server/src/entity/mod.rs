@@ -12,7 +12,14 @@ use serde_with::skip_serializing_none;
 use uuid::Uuid;
 
 use crate::{
-    entity::{brain::focus::PlayerFocus, brain::motivator::MotivatorTable, world::EntityWorld},
+    entity::{
+        brain::{
+            characteristic::{Characteristic, CharacteristicStrength},
+            focus::PlayerFocus,
+            motivator::MotivatorTable,
+        },
+        world::EntityWorld,
+    },
     hex::AxialHex,
     location::LocationKind,
 };
@@ -101,6 +108,9 @@ pub struct EntityAttributes {
 
     /// Current focus
     pub focus: Option<PlayerFocus>,
+
+    /// Optionally, a set of characteristics
+    pub characteristics: Option<HashMap<Characteristic, CharacteristicStrength>>,
 
     /// A primary hue to use when displaying this entity
     /// The value is a % out of 100 for use in HSL
@@ -278,6 +288,14 @@ pub struct EntityPayload {
 impl Entity {
     pub fn id() -> EntityId {
         Uuid::now_v7().hyphenated().to_string()
+    }
+
+    pub fn characteristic(&self, characteristic: Characteristic) -> CharacteristicStrength {
+        self.attributes
+            .characteristics
+            .as_ref()
+            .and_then(|c| c.get(&characteristic).cloned())
+            .unwrap_or_default()
     }
 }
 

@@ -213,7 +213,6 @@ macro_rules! declare_motivators {
 }
 
 declare_motivators!({
-    // Needs
     Hunger: MotivatorInit::Zero,
     Thirst: MotivatorInit::Zero,
     Boredom: MotivatorInit::Zero,
@@ -222,15 +221,7 @@ declare_motivators!({
     Tiredness: MotivatorInit::Zero,
     Saturation: MotivatorInit::Zero,
     Cold: MotivatorInit::Zero,
-    Sadness: MotivatorInit::Zero,
-
-    // Personality traits that lead to action
-    // Aggresion: Random,
-    // Planning: Random
-    // Exploration: Random
-
-    // TODO: Support a bias here so we can bias towards 33%
-    Friendliness: MotivatorInit::RandomDiscrete(3) // TODO: deprecate this
+    Sadness: MotivatorInit::Zero
 });
 
 impl Signal for Hunger {
@@ -590,68 +581,68 @@ impl Signal for Sadness {
     }
 }
 
-// Here's the idea with friendliness
-// 0% -> actively misanthropic
-// 30% -> will respond if talked to
-// 66% -> will start converstaions
-// 100% -> talks to everything
-impl Signal for Friendliness {
-    fn act_on(&self, ctx: &PlayerActionContext) -> Vec<(usize, PlayerAction)> {
-        let mut actions = Vec::new();
+// // Here's the idea with friendliness
+// // 0% -> actively misanthropic
+// // 30% -> will respond if talked to
+// // 66% -> will start converstaions
+// // 100% -> talks to everything
+// impl Signal for Friendliness {
+//     fn act_on(&self, ctx: &PlayerActionContext) -> Vec<(usize, PlayerAction)> {
+//         let mut actions = Vec::new();
 
-        // IDEAS:
-        // - talk to some random being at location
-        //   > builds up friendliness relation with that entity
-        // - share some resource with a being at location that sufficiently friendly with
-        // - I kind of want a backup action though if thats not possible, what could that be?
+//         // IDEAS:
+//         // - talk to some random being at location
+//         //   > builds up friendliness relation with that entity
+//         // - share some resource with a being at location that sufficiently friendly with
+//         // - I kind of want a backup action though if thats not possible, what could that be?
 
-        match ctx.focus {
-            PlayerFocus::Unfocused => {
-                if self.motivation > 0.6 {
-                    actions.push((
-                        10,
-                        PlayerAction::Sequential(seq!(
-                            PlayerAction::TalkWithBeing {
-                                try_cannot_respond: self.motivation > 0.9
-                            },
-                            PlayerAction::GoToAdjacent(
-                                GameLogBody::EntityTrackBeing,
-                                create_markers!(Being)
-                            )
-                        )),
-                    ));
-                }
+//         match ctx.focus {
+//             PlayerFocus::Unfocused => {
+//                 if self.motivation > 0.6 {
+//                     actions.push((
+//                         10,
+//                         PlayerAction::Sequential(seq!(
+//                             PlayerAction::TalkWithBeing {
+//                                 try_cannot_respond: self.motivation > 0.9
+//                             },
+//                             PlayerAction::GoToAdjacent(
+//                                 GameLogBody::EntityTrackBeing,
+//                                 create_markers!(Being)
+//                             )
+//                         )),
+//                     ));
+//                 }
 
-                // If not friendly, move away from people
-                if self.motivation < 0.33 {
-                    actions.push((
-                        10,
-                        PlayerAction::MoveAwayFrom(
-                            GameLogBody::EntityAvoid,
-                            create_markers!(Player),
-                        ),
-                    ));
-                }
-            }
-            PlayerFocus::Discussion { interest, .. } => {
-                // For now just chat
-                if self.motivation > 0.6 {
-                    actions.push((10, PlayerAction::Discussion(DiscussionAction::LightChat)));
-                }
+//                 // If not friendly, move away from people
+//                 if self.motivation < 0.33 {
+//                     actions.push((
+//                         10,
+//                         PlayerAction::MoveAwayFrom(
+//                             GameLogBody::EntityAvoid,
+//                             create_markers!(Player),
+//                         ),
+//                     ));
+//                 }
+//             }
+//             PlayerFocus::Discussion { interest, .. } => {
+//                 // For now just chat
+//                 if self.motivation > 0.6 {
+//                     actions.push((10, PlayerAction::Discussion(DiscussionAction::LightChat)));
+//                 }
 
-                // or chat about something heavier if more interested & friendly
-                if interest > 5 && self.motivation > 0.6 {
-                    actions.push((20, PlayerAction::Discussion(DiscussionAction::HeavyChat)));
-                }
+//                 // or chat about something heavier if more interested & friendly
+//                 if interest > 5 && self.motivation > 0.6 {
+//                     actions.push((20, PlayerAction::Discussion(DiscussionAction::HeavyChat)));
+//                 }
 
-                // And if less friendly, also lose interest potentially
-                if self.motivation < 0.6 {
-                    actions.push((5, PlayerAction::Discussion(DiscussionAction::LoseInterest)));
-                }
-            }
-            _ => {}
-        }
+//                 // And if less friendly, also lose interest potentially
+//                 if self.motivation < 0.6 {
+//                     actions.push((5, PlayerAction::Discussion(DiscussionAction::LoseInterest)));
+//                 }
+//             }
+//             _ => {}
+//         }
 
-        actions
-    }
-}
+//         actions
+//     }
+// }

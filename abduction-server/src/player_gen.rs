@@ -1,12 +1,15 @@
 use anyhow::Context;
 use rand::prelude::*;
+use std::collections::HashMap;
 use std::env;
 use std::fs::{self, File};
 use std::io::{BufReader, Read, Seek};
 use std::sync::LazyLock;
 use std::{io::SeekFrom, os::unix::fs::MetadataExt, path::PathBuf};
+use strum::IntoEnumIterator;
 
 use crate::create_markers;
+use crate::entity::brain::characteristic::{Characteristic, CharacteristicStrength};
 use crate::entity::brain::motivator::MotivatorTable;
 use crate::entity::{Entity, EntityAttributes};
 use crate::hex::AxialHex;
@@ -69,6 +72,35 @@ pub fn generate_player() -> anyhow::Result<Entity> {
     // but we could align this with alliances etc later
     attributes.display_color_hue = Some(rng.random_range(0.0..360.0));
 
+    // Generate random weak/strong attributes for a small number of characteristics
+    // (most are average because most people are average at most things...)
+    const UNIQUE_CHAR_COUNT: usize = 5;
+    let unique_characteristics =
+        Characteristic::iter().choose_multiple(&mut rng, UNIQUE_CHAR_COUNT);
+    let mut characteristics = HashMap::new();
+    for c in unique_characteristics {
+        // By default, for a given characteristic the chance is 50:50 but when young/old
+        // certain characteristics are different
+        let mut chance_of_low = 0.5;
+        if c.influenced_by_age() {
+            if age_class == AgeClass::Young {
+                chance_of_low = 0.25;
+            } else if age_class == AgeClass::Old {
+                chance_of_low = 0.75;
+            }
+        }
+
+        characteristics.insert(
+            c,
+            if rng.random_bool(chance_of_low) {
+                CharacteristicStrength::Low
+            } else {
+                CharacteristicStrength::High
+            },
+        );
+    }
+    attributes.characteristics = Some(characteristics);
+
     // Create the entity
     let player_entity = Entity {
         entity_id: Entity::id(),
@@ -115,6 +147,7 @@ pub fn random_line_from_text_file(path: &PathBuf) -> anyhow::Result<String> {
 }
 
 /// Roughly splits ages into three bands
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AgeClass {
     /// Less than 30yrs or so
     Young,
