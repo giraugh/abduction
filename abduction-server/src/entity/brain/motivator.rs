@@ -7,7 +7,7 @@ use tracing::warn;
 
 use super::{
     player_action::PlayerAction,
-    signal::{PlayerActionContext, Signal},
+    signal::{PlayerActionContext, Signal, SignalRef},
 };
 use crate::{
     create_markers,
@@ -165,18 +165,11 @@ macro_rules! declare_motivators {
         // Then declare each struct
         $(
             #[derive(Debug)]
-            pub struct $keys {
-                motivation: f32,
-                #[allow(unused)]
-                sensitivity: f32,
-            }
+            pub struct $keys(MotivatorData);
 
-            impl From<MotivatorData> for $keys {
-                fn from(value: MotivatorData) -> Self {
-                    Self {
-                        motivation: value.motivation,
-                        sensitivity: value.sensitivity,
-                    }
+            impl $keys {
+                pub fn motivation(&self) -> f32 {
+                    self.0.motivation
                 }
             }
 
@@ -194,13 +187,13 @@ macro_rules! declare_motivators {
                 table
             }
 
-            pub fn as_signals(&self) -> impl Iterator<Item = Box<dyn Signal>> {
-                let mut signals: Vec<Box<dyn Signal>> = Vec::new();
+            pub fn as_signals(&self) -> impl Iterator<Item = SignalRef> {
+                let mut signals: Vec<SignalRef> = Vec::new();
 
                 $({
                     if let Some(behaviour_data) = self.0.get(&$keys::TABLE_KEY) {
-                        let signal = $keys::from(behaviour_data.clone());
-                        signals.push(Box::new(signal));
+                        let signal = $keys(behaviour_data.clone());
+                        signals.push(SignalRef::boxed(signal));
                     } else {
                         warn!("Entity is missing motivator data for {:?}", $keys::TABLE_KEY);
                     }
@@ -236,13 +229,13 @@ impl Signal for Hunger {
                         GameLogBody::EntityGoToAdjacentLush,
                         create_markers!(LushLocation),
                     ),
-                    PlayerAction::Bark(self.motivation, MotivatorKey::Hunger),
+                    PlayerAction::Bark(self.motivation(), MotivatorKey::Hunger),
                 ];
 
                 // Eat food if we have it, maybe try finding some
-                if self.motivation > 0.3 {
+                if self.motivation() > 0.3 {
                     actions.push((
-                                if self.motivation > 0.7 { 30 } else { 10 },
+                                if self.motivation() > 0.7 { 30 } else { 10 },
                                 PlayerAction::Sequential(seq![
                                     PlayerAction::ConsumeFood { try_dubious: false, try_morally_wrong: false };
                                     ..seek_food_plan,
@@ -251,9 +244,9 @@ impl Signal for Hunger {
                 }
 
                 // Bit more desperate, eat bad food if thats all there is
-                if self.motivation > 0.6 {
+                if self.motivation() > 0.6 {
                     actions.push((
-                                if self.motivation > 0.7 { 30 } else { 10 },
+                                if self.motivation() > 0.7 { 30 } else { 10 },
                                 PlayerAction::Sequential(seq![
                                     PlayerAction::ConsumeFood { try_dubious: false, try_morally_wrong: false },
                                     PlayerAction::ConsumeFood { try_dubious: true, try_morally_wrong: false };
@@ -263,7 +256,7 @@ impl Signal for Hunger {
                 }
 
                 // if extremely hungry, we'll try absolutely desperate things
-                if self.motivation > 0.9 {
+                if self.motivation() > 0.9 {
                     actions.push((
                         10,
                         PlayerAction::ConsumeFood {
@@ -274,17 +267,17 @@ impl Signal for Hunger {
                     // actions.push((10, PlayerAction::CannibalizeSelf));
                 }
 
-                if self.motivation > 0.9 {
+                if self.motivation() > 0.9 {
                     actions.push((20, PlayerAction::BumpMotivator(MotivatorKey::Hurt)));
                 }
             }
             PlayerFocus::Discussion { .. } => {
                 // Stop talking, im hungry!
-                if self.motivation > 0.6 {
+                if self.motivation() > 0.6 {
                     actions.push((
-                        if self.motivation > 0.7 { 30 } else { 10 },
+                        if self.motivation() > 0.7 { 30 } else { 10 },
                         PlayerAction::Sequential(seq![
-                            PlayerAction::Bark(self.motivation, MotivatorKey::Hunger),
+                            PlayerAction::Bark(self.motivation(), MotivatorKey::Hunger),
                             PlayerAction::Discussion(DiscussionAction::LoseInterest),
                         ]),
                     ));
@@ -313,11 +306,11 @@ impl Signal for Thirst {
                         GameLogBody::EntityGoDownhill,
                         create_markers!(LowLyingLocation),
                     ),
-                    PlayerAction::Bark(self.motivation, MotivatorKey::Thirst),
+                    PlayerAction::Bark(self.motivation(), MotivatorKey::Thirst),
                 ];
 
                 // Little bit thirsty, start trying to get water
-                if self.motivation > 0.4 {
+                if self.motivation() > 0.4 {
                     actions.push((
                         20,
                         PlayerAction::Sequential(seq![
@@ -328,7 +321,7 @@ impl Signal for Thirst {
                 }
 
                 // Urgent Drinking! Drink whatever we have available
-                if self.motivation > 0.7 {
+                if self.motivation() > 0.7 {
                     actions.push((
                         30,
                         PlayerAction::Sequential(seq![
@@ -339,17 +332,17 @@ impl Signal for Thirst {
                     ));
                 }
 
-                if self.motivation > 0.9 {
+                if self.motivation() > 0.9 {
                     actions.push((20, PlayerAction::BumpMotivator(MotivatorKey::Hurt)));
                 }
             }
             PlayerFocus::Discussion { .. } => {
                 // Stop talking, im thirsty!
-                if self.motivation > 0.6 {
+                if self.motivation() > 0.6 {
                     actions.push((
-                        if self.motivation > 0.7 { 30 } else { 10 },
+                        if self.motivation() > 0.7 { 30 } else { 10 },
                         PlayerAction::Sequential(seq![
-                            PlayerAction::Bark(self.motivation, MotivatorKey::Hunger),
+                            PlayerAction::Bark(self.motivation(), MotivatorKey::Hunger),
                             PlayerAction::Discussion(DiscussionAction::LoseInterest),
                         ]),
                     ));
@@ -368,15 +361,15 @@ impl Signal for Boredom {
 
         match ctx.focus {
             PlayerFocus::Unfocused => {
-                if self.motivation > 0.5 {
+                if self.motivation() > 0.5 {
                     actions.push((
                         2,
-                        PlayerAction::Bark(self.motivation, MotivatorKey::Boredom),
+                        PlayerAction::Bark(self.motivation(), MotivatorKey::Boredom),
                     ));
                 }
 
                 // If bored enough, do a random movement
-                if self.motivation > 0.7 {
+                if self.motivation() > 0.7 {
                     actions.extend(
                         PlayerAction::all_movements()
                             .iter()
@@ -398,8 +391,8 @@ impl Signal for Hurt {
 
         match ctx.focus {
             PlayerFocus::Unfocused => {
-                if self.motivation > 0.5 {
-                    actions.push((5, PlayerAction::Bark(self.motivation, MotivatorKey::Hurt)));
+                if self.motivation() > 0.5 {
+                    actions.push((5, PlayerAction::Bark(self.motivation(), MotivatorKey::Hurt)));
                     actions.push((2, PlayerAction::BumpMotivator(MotivatorKey::Sadness)));
                 }
             }
@@ -408,7 +401,7 @@ impl Signal for Hurt {
 
         // Can die regardless of focus
         // If fully "motivated" then die
-        if self.motivation >= 0.99 {
+        if self.motivation() >= 0.99 {
             actions.push((1000, PlayerAction::Death));
         }
 
@@ -422,24 +415,24 @@ impl Signal for Sickness {
 
         match ctx.focus {
             PlayerFocus::Unfocused => {
-                if self.motivation > 0.0 {
+                if self.motivation() > 0.0 {
                     // Its possible for it to randomly get worse or better
                     // slightly favouring getting better
                     actions.push((8, PlayerAction::ReduceMotivator(MotivatorKey::Sickness)));
                     actions.push((5, PlayerAction::BumpMotivator(MotivatorKey::Sickness)));
                 }
 
-                if self.motivation > 0.5 {
+                if self.motivation() > 0.5 {
                     actions.push((
                         10,
-                        PlayerAction::Bark(self.motivation, MotivatorKey::Sickness),
+                        PlayerAction::Bark(self.motivation(), MotivatorKey::Sickness),
                     ));
                 }
 
-                if self.motivation > 0.8 {
+                if self.motivation() > 0.8 {
                     actions.push((
                         10,
-                        PlayerAction::Bark(self.motivation, MotivatorKey::Sickness),
+                        PlayerAction::Bark(self.motivation(), MotivatorKey::Sickness),
                     ));
                     actions.push((10, PlayerAction::BumpMotivator(MotivatorKey::Hurt)));
                 }
@@ -457,20 +450,20 @@ impl Signal for Tiredness {
 
         match ctx.focus {
             PlayerFocus::Unfocused => {
-                if self.motivation > 0.7 {
+                if self.motivation() > 0.7 {
                     actions.push((
                         10,
-                        PlayerAction::Bark(self.motivation, MotivatorKey::Tiredness),
+                        PlayerAction::Bark(self.motivation(), MotivatorKey::Tiredness),
                     ));
                 }
 
-                if self.motivation > 0.8 {
+                if self.motivation() > 0.8 {
                     actions.push((
                         20,
-                        PlayerAction::Bark(self.motivation, MotivatorKey::Tiredness),
+                        PlayerAction::Bark(self.motivation(), MotivatorKey::Tiredness),
                     ));
                     actions.push((
-                        if self.motivation > 0.95 { 50 } else { 10 },
+                        if self.motivation() > 0.95 { 50 } else { 10 },
                         PlayerAction::Sleep,
                     ));
                 }
@@ -490,24 +483,24 @@ impl Signal for Saturation {
 
         match ctx.focus {
             PlayerFocus::Unfocused => {
-                if self.motivation > 0.0 {
+                if self.motivation() > 0.0 {
                     // Complain about being wet
                     actions.push((
                         15,
-                        PlayerAction::Bark(self.motivation, MotivatorKey::Saturation),
+                        PlayerAction::Bark(self.motivation(), MotivatorKey::Saturation),
                     ));
 
                     // Just slowly become dry
                     actions.push((5, PlayerAction::ReduceMotivator(MotivatorKey::Saturation)));
                 }
 
-                if self.motivation > 0.1 {
+                if self.motivation() > 0.1 {
                     // Get more cold
                     actions.push((10, PlayerAction::BumpMotivator(MotivatorKey::Cold)));
 
                     // Maybe get sick
                     actions.push((
-                        if self.motivation > 0.5 { 10 } else { 20 },
+                        if self.motivation() > 0.5 { 10 } else { 20 },
                         PlayerAction::BumpMotivator(MotivatorKey::Sickness),
                     ));
                 }
@@ -529,25 +522,28 @@ impl Signal for Cold {
 
                 // The cold just makes you tired for now
                 // and maybe sick?
-                if self.motivation > 0.5 {
+                if self.motivation() > 0.5 {
                     actions.push((5, PlayerAction::BumpMotivator(MotivatorKey::Tiredness)));
                     actions.push((2, PlayerAction::BumpMotivator(MotivatorKey::Sickness)));
                     actions.push((2, PlayerAction::BumpMotivator(MotivatorKey::Sadness)));
-                    actions.push((10, PlayerAction::Bark(self.motivation, MotivatorKey::Cold)));
+                    actions.push((
+                        10,
+                        PlayerAction::Bark(self.motivation(), MotivatorKey::Cold),
+                    ));
                 }
 
                 // and hurt in the absolute worst case
-                if self.motivation > 0.95 {
+                if self.motivation() > 0.95 {
                     actions.push((5, PlayerAction::BumpMotivator(MotivatorKey::Hurt)));
                 }
             }
             PlayerFocus::Sleeping { .. } => {
                 // Hard to sleep if its cold
-                if self.motivation > 0.7 {
+                if self.motivation() > 0.7 {
                     actions.push((
                         5,
                         PlayerAction::Sequential(seq![
-                            PlayerAction::Bark(self.motivation, MotivatorKey::Cold),
+                            PlayerAction::Bark(self.motivation(), MotivatorKey::Cold),
                             PlayerAction::WakeUp,
                         ]),
                     ));
@@ -566,10 +562,10 @@ impl Signal for Sadness {
 
         match ctx.focus {
             PlayerFocus::Unfocused => {
-                if self.motivation > 0.0 {
+                if self.motivation() > 0.0 {
                     actions.push((
                         5,
-                        PlayerAction::Bark(self.motivation, MotivatorKey::Sadness),
+                        PlayerAction::Bark(self.motivation(), MotivatorKey::Sadness),
                     ));
                     actions.push((5, PlayerAction::ReduceMotivator(MotivatorKey::Sadness)));
                 }
@@ -598,12 +594,12 @@ impl Signal for Sadness {
 
 //         match ctx.focus {
 //             PlayerFocus::Unfocused => {
-//                 if self.motivation > 0.6 {
+//                 if self.motivation()> 0.6 {
 //                     actions.push((
 //                         10,
 //                         PlayerAction::Sequential(seq!(
 //                             PlayerAction::TalkWithBeing {
-//                                 try_cannot_respond: self.motivation > 0.9
+//                                 try_cannot_respond: self.motivation()> 0.9
 //                             },
 //                             PlayerAction::GoToAdjacent(
 //                                 GameLogBody::EntityTrackBeing,
@@ -614,7 +610,7 @@ impl Signal for Sadness {
 //                 }
 
 //                 // If not friendly, move away from people
-//                 if self.motivation < 0.33 {
+//                 if self.motivation()< 0.33 {
 //                     actions.push((
 //                         10,
 //                         PlayerAction::MoveAwayFrom(
@@ -626,17 +622,17 @@ impl Signal for Sadness {
 //             }
 //             PlayerFocus::Discussion { interest, .. } => {
 //                 // For now just chat
-//                 if self.motivation > 0.6 {
+//                 if self.motivation()> 0.6 {
 //                     actions.push((10, PlayerAction::Discussion(DiscussionAction::LightChat)));
 //                 }
 
 //                 // or chat about something heavier if more interested & friendly
-//                 if interest > 5 && self.motivation > 0.6 {
+//                 if interest > 5 && self.motivation()> 0.6 {
 //                     actions.push((20, PlayerAction::Discussion(DiscussionAction::HeavyChat)));
 //                 }
 
 //                 // And if less friendly, also lose interest potentially
-//                 if self.motivation < 0.6 {
+//                 if self.motivation()< 0.6 {
 //                     actions.push((5, PlayerAction::Discussion(DiscussionAction::LoseInterest)));
 //                 }
 //             }

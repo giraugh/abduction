@@ -1,5 +1,6 @@
 mod command;
 mod entity;
+mod event;
 mod hex;
 mod location;
 mod logs;
@@ -82,7 +83,7 @@ async fn get_match_config(ctx: QubitCtx) -> Option<MatchConfig> {
         .lock()
         .await
         .as_ref()
-        .map(|mm| mm.match_config.clone())
+        .map(|mm| mm.config.clone())
 }
 
 /// Get a stream of all tick events
@@ -376,8 +377,8 @@ async fn tick_loop(ctx: QubitCtx) -> anyhow::Result<()> {
                     .store(false, atomic::Ordering::Relaxed);
 
                 // Update the config to set `complete=true`
-                mm.match_config.complete = true;
-                mm.match_config.save(&ctx.db).await?;
+                mm.config.complete = true;
+                mm.config.save(&ctx.db).await?;
 
                 // Send an event
                 ctx.tick_tx.send(TickEvent::EndOfMatch)?;

@@ -34,6 +34,7 @@ use crate::{
         Entity, EntityAttributes, EntityFood, EntityHazard, EntityManager, EntityManagerMutation,
         EntityMarker,
     },
+    event::EventStore,
     has_markers,
     hex::AxialHex,
     location::{generate_locations_for_world, Biome},
@@ -52,8 +53,9 @@ pub type MatchId = String;
 pub type TickId = usize;
 
 pub struct MatchManager {
-    pub match_config: MatchConfig,
-    pub match_entities: EntityManager,
+    pub config: MatchConfig,
+    pub entities: EntityManager,
+    pub events: EventStore,
 }
 
 impl MatchManager {
@@ -63,8 +65,9 @@ impl MatchManager {
         match_entities.load_entities(db).await;
 
         Self {
-            match_config,
-            match_entities,
+            config: match_config,
+            entities: match_entities,
+            events: Default::default(),
         }
     }
 
@@ -74,7 +77,7 @@ impl MatchManager {
     /// the config is created
     pub async fn initialise_new_match(&mut self, db: &Db) -> anyhow::Result<()> {
         // Now we initialise it...
-        info!("Initialising match {}", &self.match_config.match_id);
+        info!("Initialising match {}", &self.config.match_id);
 
         // TODO: Add all the unescaped players from the last game
         // In practice, this just means cloning the entity into the new match
@@ -91,19 +94,18 @@ impl MatchManager {
 
         // If we dont have enough players for the match configuration,
         // then generate and add more
-        let player_count_to_gen = self.match_config.player_count - existing_players;
+        let player_count_to_gen = self.config.player_count - existing_players;
         for _ in 0..player_count_to_gen {
             let player_entity = generate_player().context("Generating player entity")?;
-            self.match_entities.upsert_entity(player_entity)?;
+            self.entities.upsert_entity(player_entity)?;
         }
 
         // Generate a location entity in each hex
         let mut rng = rand::rng();
-        for entity in
-            generate_locations_for_world(self.match_config.world_radius as isize, Biome::Green)
+        for entity in generate_locations_for_world(self.config.world_radius as isize, Biome::Green)
         {
             // Create the location
-            self.match_entities.upsert_entity(entity.clone())?;
+            self.entities.upsert_entity(entity.clone())?;
 
             // Generate some amount of props in each hex
             let hex = entity.attributes.hex.as_ref().unwrap();
@@ -116,20 +118,20 @@ impl MatchManager {
                 let mut entity = required_generator.generate(&mut rng);
                 // Set its location and insert it
                 entity.attributes.hex = Some(*hex);
-                self.match_entities.upsert_entity(entity)?;
+                self.entities.upsert_entity(entity)?;
             }
 
             // Generate a few from the optional generators
             if !prop_generators.optional.is_empty() {
                 for _ in 0..prop_count {
                     let entity = prop_generators.generate_optional_at(*hex, &mut rng);
-                    self.match_entities.upsert_entity(entity)?;
+                    self.entities.upsert_entity(entity)?;
                 }
             }
         }
 
         // Establish the current state of the world
-        self.match_entities.upsert_entity(Entity {
+        self.entities.upsert_entity(Entity {
             entity_id: Entity::id(),
             name: "World".into(),
             attributes: EntityAttributes {
@@ -146,7 +148,7 @@ impl MatchManager {
     }
 
     pub fn all_entity_states(&self) -> Vec<Entity> {
-        self.match_entities.get_all_entities().cloned().collect()
+        self.entities.get_all_entities().cloned().collect()
     }
 
     /// Perform one game tick
@@ -156,11 +158,7 @@ impl MatchManager {
         // this is our copy for performing this tick
         // NOTE: that entities wont be updated in here, so every entity kind of sees a frozen copy of the world
         //       until the next tick
-        let all_entities = self
-            .match_entities
-            .get_all_entities()
-            .cloned()
-            .collect_vec();
+        let all_entities = self.entities.get_all_entities().cloned().collect_vec();
 
         // Perform world updates
         // i.e next time/weather
@@ -190,7 +188,7 @@ impl MatchManager {
                         &current_world_state,
                         &ctx.log_tx,
                     );
-                    self.match_entities.upsert_entity(player).unwrap();
+                    self.entities.upsert_entity(player).unwrap();
                 }
             }
 
@@ -199,7 +197,7 @@ impl MatchManager {
                 if let Some(entity) = players.choose(&mut rng) {
                     // Get a new copy to preserve changes from above
                     // Skipping this step if they were removed
-                    let Some(mut player) = self.match_entities.get_entity(&entity.entity_id) else {
+                    let Some(mut player) = self.entities.get_entity(&entity.entity_id) else {
                         continue;
                     };
 
@@ -207,12 +205,10 @@ impl MatchManager {
                     match self.resolve_player_action(&mut player, &all_entities, &ctx.log_tx) {
                         Some(PlayerActionSideEffect::Death) => {
                             // Remove that player entity
-                            self.match_entities
-                                .remove_entity(&player.entity_id)
-                                .unwrap();
+                            self.entities.remove_entity(&player.entity_id).unwrap();
 
                             // Add a corpse
-                            self.match_entities
+                            self.entities
                                 .upsert_entity(Entity {
                                     entity_id: Entity::id(),
                                     markers: vec![EntityMarker::Inspectable],
@@ -231,18 +227,17 @@ impl MatchManager {
                                 .unwrap();
                         }
                         Some(PlayerActionSideEffect::RemoveOther(entity_id)) => {
-                            self.match_entities.remove_entity(&entity_id).unwrap();
-                            self.match_entities.upsert_entity(player).unwrap();
+                            self.entities.remove_entity(&entity_id).unwrap();
+                            self.entities.upsert_entity(player).unwrap();
                         }
                         Some(PlayerActionSideEffect::SetFocus { entity_id, focus }) => {
-                            let mut other_entity =
-                                self.match_entities.get_entity(&entity_id).unwrap();
+                            let mut other_entity = self.entities.get_entity(&entity_id).unwrap();
                             other_entity.attributes.focus = Some(focus);
-                            self.match_entities.upsert_entity(other_entity).unwrap();
-                            self.match_entities.upsert_entity(player).unwrap();
+                            self.entities.upsert_entity(other_entity).unwrap();
+                            self.entities.upsert_entity(player).unwrap();
                         }
                         None => {
-                            self.match_entities.upsert_entity(player).unwrap();
+                            self.entities.upsert_entity(player).unwrap();
                         }
                     }
                 }
@@ -250,16 +245,19 @@ impl MatchManager {
         }
 
         // Flush changes to entities to the DB and to clients
-        self.match_entities
+        self.entities
             .flush_changes(&ctx.tick_tx, &ctx.db)
             .await
             .unwrap();
+
+        // Clear all the events
+        self.events.clear();
     }
 
     /// is the match over? True if there is 0-1 players left
     pub fn match_over(&self) -> bool {
         let player_count = self
-            .match_entities
+            .entities
             .get_all_entities()
             .filter(|e| has_markers!(e, Player))
             .count();
@@ -281,9 +279,7 @@ impl MatchManager {
                 .as_mut()
                 .unwrap()
                 .update(&ctx.log_tx, &mut rng);
-            self.match_entities
-                .upsert_entity(world_entity.clone())
-                .unwrap();
+            self.entities.upsert_entity(world_entity.clone()).unwrap();
         }
 
         world_entity.attributes.world.unwrap()
@@ -311,7 +307,7 @@ impl MatchManager {
                 attributes: EntityAttributes {
                     hex: Some(AxialHex::random_in_bounds(
                         &mut rng,
-                        self.match_config.world_radius as isize,
+                        self.config.world_radius as isize,
                     )),
                     hazard: Some(EntityHazard { damage: 1 }),
                     ..Default::default()
@@ -323,9 +319,7 @@ impl MatchManager {
                 .send(GameLog::entity(&fire_entity, GameLogBody::LightningStrike))
                 .unwrap();
 
-            self.match_entities
-                .upsert_entity(fire_entity.clone())
-                .unwrap();
+            self.entities.upsert_entity(fire_entity.clone()).unwrap();
         }
 
         // Fire spreading
@@ -335,9 +329,7 @@ impl MatchManager {
         if current_world_state.weather.rain_proc_chance_scale() > 0.0 {
             for entity in all_entities {
                 if has_markers!(entity, Fire) && rng.random_bool(0.05) {
-                    self.match_entities
-                        .remove_entity(&entity.entity_id)
-                        .unwrap();
+                    self.entities.remove_entity(&entity.entity_id).unwrap();
 
                     // TODO: log this
                 }
@@ -356,7 +348,7 @@ impl MatchManager {
         // Is there a `hazard` entity at their hex?
         if player.attributes.hex.is_some() && rng.random_bool(0.7) {
             for entity in self
-                .match_entities
+                .entities
                 .get_all_entities()
                 .filter(|e| e.attributes.hex == player.attributes.hex)
             {
@@ -382,7 +374,7 @@ impl MatchManager {
         // Is there a water source at their location? They can fall in and get wet
         // TODO: maybe this is based on some kind of clumsiness stat?
         if rng.random_bool(0.01) {
-            if let Some(water_source_entity) = self.match_entities.get_all_entities().find(|e| {
+            if let Some(water_source_entity) = self.entities.get_all_entities().find(|e| {
                 e.attributes.water_source.is_some() && e.attributes.hex == player.attributes.hex
             }) {
                 // Emit log
@@ -500,8 +492,9 @@ impl MatchManager {
         all_entities: &Vec<Entity>,
         log_tx: &broadcast::Sender<GameLog>,
     ) -> Option<PlayerActionSideEffect> {
-        let action = player.get_next_action();
-        let result = player.resolve_action(action, all_entities, &self.match_config, log_tx);
+        let events = self.events.get_event_signals_for_entity(player);
+        let action = player.get_next_action(events);
+        let result = player.resolve_action(action, all_entities, &self.config, log_tx);
 
         // TODO: perhaps if the resolved action had no effect, I could let them try again N times?
 

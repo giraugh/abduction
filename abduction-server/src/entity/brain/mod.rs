@@ -1,6 +1,5 @@
 pub mod characteristic;
 pub mod discussion;
-pub mod event;
 pub mod focus;
 pub mod motivator;
 pub mod player_action;
@@ -19,7 +18,7 @@ use crate::{
         brain::{
             characteristic::{Characteristic, CharacteristicStrength},
             player_action::{PlayerAction, PlayerActionResult, PlayerActionSideEffect},
-            signal::PlayerActionContext,
+            signal::{PlayerActionContext, Signal, SignalRef},
         },
         Entity, EntityFood, EntityWaterSource,
     },
@@ -33,7 +32,10 @@ use focus::PlayerFocus;
 impl Entity {
     /// Determine the next action to be taken by an entity
     /// Only applicable for players
-    pub fn get_next_action(&self) -> PlayerAction {
+    pub fn get_next_action<'a>(
+        &'a self,
+        event_signals: impl Iterator<Item = SignalRef<'a>>,
+    ) -> PlayerAction {
         // Build the context for acting (WIP)
         let ctx = PlayerActionContext {
             focus: self
@@ -45,12 +47,8 @@ impl Entity {
         };
 
         // Collect signals
-        let signals = self
-            .attributes
-            .motivators
-            .as_signals()
-            //.chain(other) // TODO: add events
-            .collect_vec();
+        let motivator_signals = self.attributes.motivators.as_signals();
+        let signals = itertools::chain!(motivator_signals, event_signals).collect_vec();
 
         // Then resolve them into actions
         let mut action_weights = signals
