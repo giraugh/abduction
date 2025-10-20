@@ -34,7 +34,7 @@ use crate::{
         Entity, EntityAttributes, EntityFood, EntityHazard, EntityManager, EntityManagerMutation,
         EntityMarker,
     },
-    event::EventStore,
+    event::{EventStore, EventsView},
     has_markers,
     hex::AxialHex,
     location::{generate_locations_for_world, Biome},
@@ -168,6 +168,11 @@ impl MatchManager {
         // (i.e that dont target specific players at random, just stuff everywhere)
         self.resolve_global_world_effects(&all_entities, &current_world_state, ctx);
 
+        // Prepare a view for the events this tick
+        // NOTE: makes me sad these have to be seperate calls....
+        self.events.new_tick();
+        let events = self.events.view();
+
         // Lets just attempt to implement the main entity loop and see how we go I guess?
         // Rough plan is that each hex has one player action - the player who acted last acts now
         // This is encoded as the player with the highest `TicksWaited` attribute
@@ -202,7 +207,12 @@ impl MatchManager {
                     };
 
                     // Go update it
-                    match self.resolve_player_action(&mut player, &all_entities, &ctx.log_tx) {
+                    match self.resolve_player_action(
+                        &mut player,
+                        &all_entities,
+                        &events,
+                        &ctx.log_tx,
+                    ) {
                         Some(PlayerActionSideEffect::Death) => {
                             // Remove that player entity
                             self.entities.remove_entity(&player.entity_id).unwrap();
@@ -249,9 +259,6 @@ impl MatchManager {
             .flush_changes(&ctx.tick_tx, &ctx.db)
             .await
             .unwrap();
-
-        // Clear all the events
-        self.events.clear();
     }
 
     /// is the match over? True if there is 0-1 players left
@@ -487,12 +494,13 @@ impl MatchManager {
     }
 
     fn resolve_player_action(
-        &mut self,
+        &self,
         player: &mut Entity,
         all_entities: &Vec<Entity>,
+        events: &EventsView,
         log_tx: &broadcast::Sender<GameLog>,
     ) -> Option<PlayerActionSideEffect> {
-        let events = self.events.get_event_signals_for_entity(player);
+        let events = events.get_event_signals_for_entity(player);
         let action = player.get_next_action(events);
         let result = player.resolve_action(action, all_entities, &self.config, log_tx);
 

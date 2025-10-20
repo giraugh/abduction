@@ -83,12 +83,67 @@ pub enum GameEventTarget {
 ///       I could have a pending events buffer? That gets swapped in when cleared? and thats when I populate the maps?
 #[derive(Debug, Clone, Default)]
 pub struct EventStore {
-    events_by_entity: HashMap<EntityId, Vec<GameEvent>>,
-    events_by_hex: HashMap<AxialHex, Vec<GameEvent>>,
-    global_events: Vec<GameEvent>,
+    /// The store that backs the event references
+    events: Vec<GameEvent>,
+
+    /// Events that were added this tick, will be swapped in next tick
+    pending_events: Vec<GameEvent>,
 }
 
-impl EventStore {
+#[derive(Debug, Clone, Default)]
+pub struct EventsView<'a> {
+    events_by_entity: HashMap<EntityId, Vec<&'a GameEvent>>,
+    events_by_hex: HashMap<AxialHex, Vec<&'a GameEvent>>,
+    global_events: Vec<&'a GameEvent>,
+}
+
+impl<'a> EventsView<'a> {
+    fn new(events: &'a Vec<GameEvent>) -> Self {
+        let mut view = Self::default();
+        for event in events {
+            match &event.target {
+                GameEventTarget::Entity(id) => {
+                    view.events_by_entity
+                        .entry(id.clone())
+                        .or_default()
+                        .push(event);
+                }
+                GameEventTarget::Entities(ids) => {
+                    for id in ids {
+                        view.events_by_entity
+                            .entry(id.clone())
+                            .or_default()
+                            .push(event);
+                    }
+                }
+
+                GameEventTarget::Hex(axial_hex) => {
+                    view.events_by_hex
+                        .entry(*axial_hex)
+                        .or_default()
+                        .push(event);
+                }
+                GameEventTarget::HexSurrounds(axial_hex) => {
+                    // NOTE: this can store events in out-of-bound hexs but we just ignore that
+                    // they'll never get recalled and then theyll be deleted
+                    view.events_by_hex
+                        .entry(*axial_hex)
+                        .or_default()
+                        .push(event);
+                    for hex in axial_hex.neighbours() {
+                        view.events_by_hex.entry(hex).or_default().push(event);
+                    }
+                }
+
+                GameEventTarget::Global => {
+                    view.global_events.push(event);
+                }
+            }
+        }
+
+        view
+    }
+
     /// Get the events that are relevant for an entity this tick
     pub fn get_event_signals_for_entity(&self, entity: &Entity) -> impl Iterator<Item = SignalRef> {
         // Start with events just for this entity
@@ -106,55 +161,26 @@ impl EventStore {
         let for_all = self.global_events.iter();
 
         // Then return them all
-        itertools::chain!(for_hex, for_all, for_entity).map(SignalRef::reference)
+        itertools::chain!(for_hex, for_all, for_entity).map(|&e| SignalRef::reference(e))
     }
+}
 
+impl EventStore {
+    /// Adds a new pending event to be inserted into the store on the next tick
+    /// NOTE: will not be resolved this tick
     pub fn add_event(&mut self, event: GameEvent) {
-        match &event.target {
-            GameEventTarget::Entity(id) => {
-                self.events_by_entity
-                    .entry(id.clone())
-                    .or_default()
-                    .push(event);
-            }
-            GameEventTarget::Entities(ids) => {
-                // it gets mad at me if I do this the standard way so uhh bare with me ig...
-                let events = std::iter::repeat_with(|| event.clone());
-                for (id, event) in std::iter::zip(ids, events) {
-                    self.events_by_entity
-                        .entry(id.clone())
-                        .or_default()
-                        .push(event);
-                }
-            }
-
-            GameEventTarget::Hex(axial_hex) => {
-                self.events_by_hex
-                    .entry(*axial_hex)
-                    .or_default()
-                    .push(event);
-            }
-            GameEventTarget::HexSurrounds(axial_hex) => {
-                // NOTE: this can store events in out-of-bound hexs but we just ignore that
-                // they'll never get recalled and then theyll be deleted
-                // NOTE: it gets mad at me if I do this the standard way so uhh bare with me ig...
-                let hexs = axial_hex.neighbours();
-                let events = std::iter::repeat_with(|| event.clone());
-                for (hex, event) in std::iter::zip(hexs, events) {
-                    self.events_by_hex.entry(hex).or_default().push(event);
-                }
-            }
-
-            GameEventTarget::Global => {
-                self.global_events.push(event);
-            }
-        }
+        self.pending_events.push(event);
     }
 
-    /// Remove all events
-    pub fn clear(&mut self) {
-        self.events_by_entity.clear();
-        self.events_by_hex.clear();
-        self.global_events.clear();
+    pub fn new_tick(&mut self) {
+        // Swap the pending events in
+        std::mem::swap(&mut self.pending_events, &mut self.events);
+
+        // and clear them out
+        self.pending_events.clear();
+    }
+
+    pub fn view(&self) -> EventsView<'_> {
+        EventsView::new(&self.events)
     }
 }
