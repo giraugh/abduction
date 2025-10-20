@@ -48,13 +48,10 @@ impl Entity {
 
         // Collect signals
         let motivator_signals = self.attributes.motivators.as_signals();
-        let signals = itertools::chain!(motivator_signals, event_signals).collect_vec();
+        let signals = itertools::chain!(motivator_signals, event_signals);
 
         // Then resolve them into actions
-        let mut action_weights = signals
-            .iter()
-            .flat_map(|signal| signal.act_on(&ctx))
-            .collect_vec();
+        let mut action_weights = signals.flat_map(|signal| signal.act_on(&ctx)).collect_vec();
 
         // And add a no-op so its always an option
         action_weights.push((1, PlayerAction::Nothing));
