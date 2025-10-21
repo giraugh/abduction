@@ -1,11 +1,13 @@
+pub mod builder;
+pub mod signal;
+
 use std::collections::{HashMap, HashSet};
+
+use tracing::debug;
 
 use crate::{
     entity::{
-        brain::{
-            characteristic::Characteristic,
-            signal::{Signal, SignalRef},
-        },
+        brain::{characteristic::Characteristic, signal::SignalRef},
         Entity, EntityId,
     },
     hex::AxialHex,
@@ -25,15 +27,6 @@ pub struct GameEvent {
     notice_conditions: Option<Vec<NoticeCondition>>,
 }
 
-impl Signal for GameEvent {
-    fn act_on(
-        &self,
-        ctx: &crate::entity::brain::signal::PlayerActionContext,
-    ) -> Vec<(usize, crate::entity::brain::player_action::PlayerAction)> {
-        todo!()
-    }
-}
-
 /// Some condition for noticing an event
 #[derive(Debug, Clone)]
 pub enum NoticeCondition {
@@ -45,15 +38,15 @@ pub enum NoticeCondition {
     },
 }
 
-/// TODO: this is what implements signal? Or is the location usefull to have?
 #[derive(Debug, Clone)]
 pub enum GameEventKind {
-    // TODO
+    /// Some entity arrives in a new hex
+    ArriveInHex { entity_id: EntityId },
+
+    /// Some entity leaves a given hex
+    LeaveHex { entity_id: EntityId },
 }
 
-// TODO: should this be inverted? And so we just store it where it targets that thing? like we have a collection that maps hexs to events and we
-//       just set that? Tho ig I could use this for the interface and then place it into that map accordingly??
-//       Have an entity_events and a hex_events map?
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GameEventTarget {
     /// A specific entity
@@ -75,19 +68,16 @@ pub enum GameEventTarget {
 /// A store for the events raised during a tick
 /// raised events are processed in the next tick
 ///
-/// TODO: it might be nice to have one big pool of `GameEvent` that I then
+/// FUTURE: it might be nice to have one big pool of `GameEvent` that I then
 ///       reference from each map, to reduce duplication. Maybe even a memory arena?
 ///
-/// TODO: Events can be added mid-tick but should not be processed then.
+/// NOTE: Events can be added mid-tick but should not be processed then.
 ///       ig if I just resolve all the signals before acting? more memory tho hmm... tho they are just refs
 ///       I could have a pending events buffer? That gets swapped in when cleared? and thats when I populate the maps?
 #[derive(Debug, Clone, Default)]
 pub struct EventStore {
     /// The store that backs the event references
     events: Vec<GameEvent>,
-
-    /// Events that were added this tick, will be swapped in next tick
-    pending_events: Vec<GameEvent>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -166,18 +156,18 @@ impl<'a> EventsView<'a> {
 }
 
 impl EventStore {
-    /// Adds a new pending event to be inserted into the store on the next tick
-    /// NOTE: will not be resolved this tick
-    pub fn add_event(&mut self, event: GameEvent) {
-        self.pending_events.push(event);
-    }
+    /// End the current tick, swapping in the buffer of events as the events for the next tick
+    pub fn end_tick(&mut self, pending: Vec<GameEvent>) {
+        // Analytics
+        debug!("Loading {} events for next tick", pending.len());
 
-    pub fn new_tick(&mut self) {
-        // Swap the pending events in
-        std::mem::swap(&mut self.pending_events, &mut self.events);
+        // Currently pending events become the events for the next tick
+        let mut pending = pending;
+        std::mem::swap(&mut pending, &mut self.events);
 
-        // and clear them out
-        self.pending_events.clear();
+        // This will happen anyway but lets do it explicitly
+        // at this point, the pending variable is actually the former active events
+        drop(pending);
     }
 
     pub fn view(&self) -> EventsView<'_> {

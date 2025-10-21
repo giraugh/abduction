@@ -1,4 +1,5 @@
 pub mod brain;
+pub mod gen;
 pub mod manager;
 pub mod world;
 

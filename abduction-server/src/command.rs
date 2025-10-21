@@ -5,7 +5,7 @@ use std::{str::FromStr, sync::atomic};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 use tracing::info;
 
-use crate::QubitCtx;
+use crate::ServerCtx;
 
 #[derive(Debug, Clone, strum::AsRefStr, strum::EnumString)]
 pub enum Command {
@@ -14,7 +14,7 @@ pub enum Command {
 }
 
 impl Command {
-    pub async fn handle(&self, ctx: QubitCtx) -> anyhow::Result<()> {
+    pub async fn handle(&self, ctx: ServerCtx) -> anyhow::Result<()> {
         match self {
             Command::EndMatch => {
                 info!("Match will end after next tick");
@@ -28,7 +28,7 @@ impl Command {
     }
 }
 
-pub async fn process_stdin_commands(ctx: QubitCtx) -> anyhow::Result<()> {
+pub async fn process_stdin_commands(ctx: ServerCtx) -> anyhow::Result<()> {
     let stdin = io::stdin();
     let reader = BufReader::new(stdin);
     let mut lines = reader.lines();

@@ -2,10 +2,7 @@ use serde::Serialize;
 
 use crate::{
     entity::{
-        brain::{
-            discussion::{self, Topic},
-            motivator::MotivatorKey,
-        },
+        brain::{discussion, motivator::MotivatorKey},
         world::{TimeOfDay, WeatherKind},
         Entity, EntityId,
     },

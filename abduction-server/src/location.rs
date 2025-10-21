@@ -9,9 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     create_markers,
-    entity::{Entity, EntityAttributes, EntityLocation, EntityMarker},
+    entity::{gen::PropGenerator, Entity, EntityAttributes, EntityLocation, EntityMarker},
     hex::AxialHex,
-    prop::PropGenerator,
 };
 
 /// A list of required/optional prop generators for a location

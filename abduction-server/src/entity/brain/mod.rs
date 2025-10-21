@@ -10,7 +10,6 @@ use rand::{
     distr::{weighted::WeightedIndex, Distribution},
     seq::{IndexedRandom, IteratorRandom},
 };
-use tokio::sync::broadcast;
 use tracing::warn;
 
 use crate::{
@@ -18,14 +17,15 @@ use crate::{
         brain::{
             characteristic::{Characteristic, CharacteristicStrength},
             player_action::{PlayerAction, PlayerActionResult, PlayerActionSideEffect},
-            signal::{PlayerActionContext, Signal, SignalRef},
+            signal::{Signal, SignalContext, SignalRef, WeightedPlayerActions},
         },
         Entity, EntityFood, EntityWaterSource,
     },
+    event::{builder::GameEventBuilder, GameEventKind, GameEventTarget},
     has_markers,
     hex::AxialHexDirection,
     logs::{GameLog, GameLogBody},
-    mtch::MatchConfig,
+    mtch::ActionCtx,
 };
 use focus::PlayerFocus;
 
@@ -37,7 +37,7 @@ impl Entity {
         event_signals: impl Iterator<Item = SignalRef<'a>>,
     ) -> PlayerAction {
         // Build the context for acting (WIP)
-        let ctx = PlayerActionContext {
+        let ctx = SignalContext {
             focus: self
                 .attributes
                 .focus
@@ -51,28 +51,15 @@ impl Entity {
         let signals = itertools::chain!(motivator_signals, event_signals);
 
         // Then resolve them into actions
-        let mut action_weights = signals.flat_map(|signal| signal.act_on(&ctx)).collect_vec();
-
-        // And add a no-op so its always an option
-        action_weights.push((1, PlayerAction::Nothing));
-
-        // TODO: remove impossible actions such as out-of-bounds movement here
-
-        // Create a weighted distribution over the actions
-        let (weights, actions): (Vec<_>, Vec<_>) = action_weights.into_iter().unzip();
-        let dist = WeightedIndex::new(&weights).unwrap();
-
-        // Sample the distribution
-        let mut rng = rand::rng();
-        actions[dist.sample(&mut rng)].clone()
+        let mut actions = WeightedPlayerActions::default();
+        signals.for_each(|signal| signal.act_on(&ctx, &mut actions));
+        actions.sample(&mut rand::rng())
     }
 
     pub fn resolve_action(
         &mut self,
         action: PlayerAction,
-        all_entities: &Vec<Entity>,
-        config: &MatchConfig,
-        log_tx: &broadcast::Sender<GameLog>,
+        ctx: &mut ActionCtx,
     ) -> PlayerActionResult {
         match &action {
             PlayerAction::Nothing => {
@@ -81,7 +68,7 @@ impl Entity {
 
             PlayerAction::Sequential(sub_actions) => {
                 for sub_action in sub_actions {
-                    match self.resolve_action(sub_action.clone(), all_entities, config, log_tx) {
+                    match self.resolve_action(sub_action.clone(), ctx) {
                         PlayerActionResult::SideEffect(side_effect) => {
                             return PlayerActionResult::SideEffect(side_effect)
                         }
@@ -108,12 +95,7 @@ impl Entity {
             }
 
             PlayerAction::Discussion(discussion_action) => {
-                return self.resolve_discussion_action(
-                    discussion_action,
-                    all_entities,
-                    config,
-                    log_tx,
-                )
+                return self.resolve_discussion_action(discussion_action, ctx)
             }
 
             PlayerAction::WakeUp => {
@@ -125,9 +107,7 @@ impl Entity {
                         // Its very beneficial!
                         self.attributes.motivators.reduce_by::<motivator::Hurt>(0.2);
 
-                        log_tx
-                            .send(GameLog::entity(self, GameLogBody::EntityStopSleeping))
-                            .unwrap();
+                        ctx.send_log(GameLog::entity(self, GameLogBody::EntityStopSleeping));
                     }
                     _ => return PlayerActionResult::NoEffect,
                 }
@@ -148,9 +128,7 @@ impl Entity {
                             // Its very beneficial!
                             self.attributes.motivators.reduce_by::<motivator::Hurt>(0.2);
 
-                            log_tx
-                                .send(GameLog::entity(self, GameLogBody::EntityStopSleeping))
-                                .unwrap();
+                            ctx.send_log(GameLog::entity(self, GameLogBody::EntityStopSleeping));
                         } else {
                             *remaining_turns -= 1;
 
@@ -160,9 +138,7 @@ impl Entity {
                                 .motivators
                                 .reduce_by::<motivator::Tiredness>(0.2);
 
-                            log_tx
-                                .send(GameLog::entity(self, GameLogBody::EntityKeepSleeping))
-                                .unwrap();
+                            ctx.send_log(GameLog::entity(self, GameLogBody::EntityKeepSleeping));
                         }
                     }
 
@@ -172,9 +148,7 @@ impl Entity {
                             remaining_turns: 25,
                         });
 
-                        log_tx
-                            .send(GameLog::entity(self, GameLogBody::EntityStartSleeping))
-                            .unwrap();
+                        ctx.send_log(GameLog::entity(self, GameLogBody::EntityStartSleeping));
                     }
                 };
 
@@ -183,9 +157,7 @@ impl Entity {
 
             // Literally die
             PlayerAction::Death => {
-                log_tx
-                    .send(GameLog::entity(self, GameLogBody::EntityDeath))
-                    .unwrap();
+                ctx.send_log(GameLog::entity(self, GameLogBody::EntityDeath));
 
                 return PlayerActionResult::SideEffect(PlayerActionSideEffect::Death);
             }
@@ -194,7 +166,8 @@ impl Entity {
                 let mut rng = rand::rng();
 
                 // Get entities at my location with that marker
-                let avoid_entities = all_entities
+                let avoid_entities = ctx
+                    .all_entities
                     .iter()
                     .filter(|e| {
                         e.entity_id != self.entity_id
@@ -210,16 +183,14 @@ impl Entity {
                 };
 
                 // Emit log
-                log_tx
-                    .send(GameLog::entity_pair(self, *avoid_entity, log_body.clone()))
-                    .unwrap();
+                ctx.send_log(GameLog::entity_pair(self, *avoid_entity, log_body.clone()));
 
                 // Then move randomly
                 let move_action = PlayerAction::all_movements()
                     .choose(&mut rng)
                     .unwrap()
                     .clone();
-                return self.resolve_action(move_action, all_entities, config, log_tx);
+                return self.resolve_action(move_action, ctx);
             }
 
             PlayerAction::GoToAdjacent(log_body, markers) => {
@@ -232,7 +203,7 @@ impl Entity {
                 };
 
                 // Is the current hex such a hex?
-                let current_hex_valid = all_entities.iter().any(|e| {
+                let current_hex_valid = ctx.all_entities.iter().any(|e| {
                     e.attributes.hex.is_some()
                         && e.attributes.hex == Some(my_hex)
                         && markers.iter().any(|m| e.markers.contains(m))
@@ -243,7 +214,8 @@ impl Entity {
                 }
 
                 // If not, pull all applicable adjacent entities
-                let adj_entities = all_entities
+                let adj_entities = ctx
+                    .all_entities
                     .iter()
                     .filter(|e| match e.attributes.hex {
                         None => false,
@@ -264,17 +236,10 @@ impl Entity {
                     .expect("Cannot determine direction to adj hex");
 
                 // Emit log
-                log_tx
-                    .send(GameLog::entity(self, log_body.clone()))
-                    .unwrap();
+                ctx.send_log(GameLog::entity(self, log_body.clone()));
 
                 // Travel towards that hex
-                return self.resolve_action(
-                    PlayerAction::Move(direction),
-                    all_entities,
-                    config,
-                    log_tx,
-                );
+                return self.resolve_action(PlayerAction::Move(direction), ctx);
             }
 
             // This is a little tricky lets be honest
@@ -287,7 +252,7 @@ impl Entity {
                 };
 
                 // Is the current hex such a hex?
-                let current_hex_valid = all_entities.iter().any(|e| {
+                let current_hex_valid = ctx.all_entities.iter().any(|e| {
                     e.attributes.hex.is_some()
                         && e.attributes.hex == Some(my_hex)
                         && markers.iter().any(|m| e.markers.contains(m))
@@ -298,7 +263,8 @@ impl Entity {
                 }
 
                 // If not, pull all applicable entities
-                let target_entities = all_entities
+                let target_entities = ctx
+                    .all_entities
                     .iter()
                     .filter(|e| markers.iter().any(|m| e.markers.contains(m)))
                     .collect_vec();
@@ -319,36 +285,27 @@ impl Entity {
                 let adjacent_hex = my_hex
                     .neighbours()
                     .into_iter()
-                    .filter(|h| h.within_bounds(config.world_radius as isize))
+                    .filter(|h| h.within_bounds(ctx.config.world_radius as isize))
                     .min_by_key(|h| h.dist_to(target_hex))
                     .unwrap();
 
                 // Emit log
-                log_tx
-                    .send(GameLog::entity(self, log_body.clone()))
-                    .unwrap();
+                ctx.send_log(GameLog::entity(self, log_body.clone()));
 
                 // And travel towards that
                 let direction = AxialHexDirection::direction_to(my_hex, adjacent_hex).unwrap();
-                return self.resolve_action(
-                    PlayerAction::Move(direction),
-                    all_entities,
-                    config,
-                    log_tx,
-                );
+                return self.resolve_action(PlayerAction::Move(direction), ctx);
             }
 
             // Indicating a high motivator value
             PlayerAction::Bark(motivation, motivator) => {
-                log_tx
-                    .send(GameLog::entity(
-                        self,
-                        GameLogBody::EntityMotivatorBark {
-                            motivation: *motivation,
-                            motivator: *motivator,
-                        },
-                    ))
-                    .unwrap();
+                ctx.send_log(GameLog::entity(
+                    self,
+                    GameLogBody::EntityMotivatorBark {
+                        motivation: *motivation,
+                        motivator: *motivator,
+                    },
+                ));
 
                 // This returns no effect so that the boredom is increased and to allow stacking barks + other actions w/ Sequential
                 return PlayerActionResult::NoEffect;
@@ -360,7 +317,8 @@ impl Entity {
             } => {
                 // Is there food at this location?
                 let mut rng = rand::rng();
-                let food_entities = all_entities
+                let food_entities = ctx
+                    .all_entities
                     .iter()
                     .filter(|e| {
                         e.attributes.hex.is_some() && e.attributes.hex == self.attributes.hex
@@ -394,23 +352,19 @@ impl Entity {
                 // is this morally wrong, hesitate for a second (send log before the eat log)
                 if food.morally_wrong {
                     // TODO: maybe chance to bail based on a stat
-                    log_tx
-                        .send(GameLog::entity_pair(
-                            self,
-                            food_entity,
-                            GameLogBody::EntityHesitateBeforeConsume,
-                        ))
-                        .unwrap();
+                    ctx.send_log(GameLog::entity_pair(
+                        self,
+                        food_entity,
+                        GameLogBody::EntityHesitateBeforeConsume,
+                    ));
                 }
 
                 // emit log
-                log_tx
-                    .send(GameLog::entity_pair(
-                        self,
-                        food_entity,
-                        GameLogBody::EntityConsume,
-                    ))
-                    .unwrap();
+                ctx.send_log(GameLog::entity_pair(
+                    self,
+                    food_entity,
+                    GameLogBody::EntityConsume,
+                ));
 
                 // was it poisonous
                 if food.sustenance < 0.0 {
@@ -418,13 +372,11 @@ impl Entity {
                         .motivators
                         .bump_scaled::<motivator::Sickness>(food.sustenance);
 
-                    log_tx
-                        .send(GameLog::entity_pair(
-                            self,
-                            food_entity,
-                            GameLogBody::EntityComplainAboutTaste,
-                        ))
-                        .unwrap();
+                    ctx.send_log(GameLog::entity_pair(
+                        self,
+                        food_entity,
+                        GameLogBody::EntityComplainAboutTaste,
+                    ));
                 }
 
                 // Return side effect to remove the food
@@ -436,7 +388,8 @@ impl Entity {
             PlayerAction::DrinkFromWaterSource { try_dubious } => {
                 // Is there food at this location?
                 let mut rng = rand::rng();
-                let water_source_entities = all_entities
+                let water_source_entities = ctx
+                    .all_entities
                     .iter()
                     .filter(|e| {
                         e.attributes.hex.is_some() && e.attributes.hex == self.attributes.hex
@@ -468,33 +421,30 @@ impl Entity {
                 self.attributes.motivators.clear::<motivator::Thirst>();
 
                 // Emit log
-                log_tx
-                    .send(GameLog::entity_pair(
-                        self,
-                        water_source_entity,
-                        GameLogBody::EntityDrinkFrom,
-                    ))
-                    .unwrap();
+                ctx.send_log(GameLog::entity_pair(
+                    self,
+                    water_source_entity,
+                    GameLogBody::EntityDrinkFrom,
+                ));
 
                 // Should we get sick?
                 if water_source.poison > 0.0 {
                     self.attributes
                         .motivators
                         .bump_scaled::<motivator::Sickness>(2.0 * water_source.poison);
-                    log_tx
-                        .send(GameLog::entity_pair(
-                            self,
-                            water_source_entity,
-                            GameLogBody::EntityComplainAboutTaste,
-                        ))
-                        .unwrap();
+                    ctx.send_log(GameLog::entity_pair(
+                        self,
+                        water_source_entity,
+                        GameLogBody::EntityComplainAboutTaste,
+                    ));
                 }
 
                 return PlayerActionResult::Ok;
             }
 
             PlayerAction::TalkWithBeing { try_cannot_respond } => {
-                let being_entities = all_entities
+                let being_entities = ctx
+                    .all_entities
                     .iter()
                     .filter(|e| {
                         e.attributes.hex.is_some()
@@ -528,15 +478,13 @@ impl Entity {
                     .unwrap_or(0.0);
 
                 // Log
-                log_tx
-                    .send(GameLog::entity_pair(
-                        self,
-                        being_entity,
-                        GameLogBody::EntityGreet {
-                            bond: association_bond_strength,
-                        },
-                    ))
-                    .unwrap();
+                ctx.send_log(GameLog::entity_pair(
+                    self,
+                    being_entity,
+                    GameLogBody::EntityGreet {
+                        bond: association_bond_strength,
+                    },
+                ));
 
                 // If they are unfriendly, this goes differently
                 // NOTE: if they dont have motivators, we assume they are friendly (assuming that animals etc are friendly)
@@ -544,13 +492,11 @@ impl Entity {
                 let friendliness = being_entity.characteristic(Characteristic::Friendliness);
                 if friendliness < CharacteristicStrength::Average {
                     // they ignore us
-                    log_tx
-                        .send(GameLog::entity_pair(
-                            being_entity,
-                            &self.entity_id,
-                            GameLogBody::EntityIgnore,
-                        ))
-                        .unwrap();
+                    ctx.send_log(GameLog::entity_pair(
+                        being_entity,
+                        &self.entity_id,
+                        GameLogBody::EntityIgnore,
+                    ));
 
                     // And we like them less
                     self.relations
@@ -595,21 +541,39 @@ impl Entity {
                     .as_mut()
                     .expect("Cannot move without hex attribute");
                 let new_hex = *hex + (*hex_direction).into();
-                if new_hex.within_bounds(config.world_radius as isize) {
-                    *hex = new_hex;
-
+                if new_hex.within_bounds(ctx.config.world_radius as isize) {
                     // If succesfull, get thirsty and tired
                     self.attributes.motivators.bump::<motivator::Thirst>();
                     self.attributes
                         .motivators
                         .bump_scaled::<motivator::Tiredness>(0.3);
 
-                    log_tx
-                        .send(GameLog::entity(
-                            self,
-                            GameLogBody::EntityMovement { by: *hex_direction },
-                        ))
-                        .unwrap();
+                    // And raise an event
+                    GameEventBuilder::new()
+                        .of_kind(GameEventKind::LeaveHex {
+                            entity_id: self.entity_id.clone(),
+                        })
+                        .targets(GameEventTarget::Hex(*hex))
+                        .with_sense(Characteristic::Vision, 0)
+                        .with_sense(Characteristic::Hearing, 0)
+                        .add(ctx);
+                    GameEventBuilder::new()
+                        .of_kind(GameEventKind::ArriveInHex {
+                            entity_id: self.entity_id.clone(),
+                        })
+                        .targets(GameEventTarget::Hex(new_hex))
+                        .with_sense(Characteristic::Vision, 0)
+                        .with_sense(Characteristic::Hearing, 0)
+                        .add(ctx);
+
+                    // Actually move
+                    *hex = new_hex;
+
+                    // and a log
+                    ctx.send_log(GameLog::entity(
+                        self,
+                        GameLogBody::EntityMovement { by: *hex_direction },
+                    ));
                 }
             }
         }

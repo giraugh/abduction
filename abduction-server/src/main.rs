@@ -5,8 +5,6 @@ mod hex;
 mod location;
 mod logs;
 mod mtch;
-mod player_gen;
-mod prop;
 
 use axum::routing::get;
 use futures::{Stream, StreamExt};
@@ -40,7 +38,7 @@ pub type Db = Pool<Sqlite>;
 
 /// The context type for qubit
 #[derive(Clone)]
-struct QubitCtx {
+struct ServerCtx {
     /// Sender for tick events
     /// (This is lifecycle events and entity updates)
     tick_tx: broadcast::Sender<TickEvent>,
@@ -67,7 +65,7 @@ struct CtxFlags {
 
 /// Get the current state of all entities
 #[handler(query)]
-async fn get_entity_states(ctx: QubitCtx) -> Option<Vec<Entity>> {
+async fn get_entity_states(ctx: ServerCtx) -> Option<Vec<Entity>> {
     ctx.match_manager
         .lock()
         .await
@@ -78,7 +76,7 @@ async fn get_entity_states(ctx: QubitCtx) -> Option<Vec<Entity>> {
 /// Get the config for the current match
 /// Returns null if no current match
 #[handler(query)]
-async fn get_match_config(ctx: QubitCtx) -> Option<MatchConfig> {
+async fn get_match_config(ctx: ServerCtx) -> Option<MatchConfig> {
     ctx.match_manager
         .lock()
         .await
@@ -88,7 +86,7 @@ async fn get_match_config(ctx: QubitCtx) -> Option<MatchConfig> {
 
 /// Get a stream of all tick events
 #[handler(subscription)]
-async fn events_stream(ctx: QubitCtx) -> impl Stream<Item = TickEvent> {
+async fn events_stream(ctx: ServerCtx) -> impl Stream<Item = TickEvent> {
     let stream = tokio_stream::wrappers::BroadcastStream::new(ctx.tick_tx.subscribe());
     stream.filter_map(|e| async { e.ok() })
 }
@@ -96,7 +94,7 @@ async fn events_stream(ctx: QubitCtx) -> impl Stream<Item = TickEvent> {
 /// Get a stream of game logs
 /// TODO: these should prob be saved to the DB too
 #[handler(subscription)]
-async fn game_log_stream(ctx: QubitCtx) -> impl Stream<Item = GameLog> {
+async fn game_log_stream(ctx: ServerCtx) -> impl Stream<Item = GameLog> {
     let stream = tokio_stream::wrappers::BroadcastStream::new(ctx.log_tx.subscribe());
     stream.filter_map(|e| async { e.ok() })
 }
@@ -157,7 +155,7 @@ async fn main() {
     // Create a spot that could later be a match manager (youll see)
     let match_manager = Arc::default();
     let ctx_flags = CtxFlags::default();
-    let qubit_ctx = QubitCtx {
+    let server_ctx = ServerCtx {
         tick_tx: tick_tx.clone(),
         log_tx: log_tx.clone(),
         db: db.clone(),
@@ -166,7 +164,7 @@ async fn main() {
     };
 
     // Create service and handle
-    let (qubit_service, qubit_handle) = router.as_rpc(qubit_ctx.clone()).into_service();
+    let (qubit_service, qubit_handle) = router.as_rpc(server_ctx.clone()).into_service();
 
     // Nest into an Axum router
     let axum_router = axum::Router::<()>::new()
@@ -239,7 +237,7 @@ async fn main() {
     // and/or load the schedule for the next one
     tracker.spawn({
         let token = token.clone();
-        let qubit_ctx = qubit_ctx.clone();
+        let qubit_ctx = server_ctx.clone();
         let start_match_runner = async move {
             loop {
                 // Run the match...
@@ -259,7 +257,7 @@ async fn main() {
     // Listen for commands on stdin and handle them
     tracker.spawn({
         let token = token.clone();
-        let qubit_ctx = qubit_ctx.clone();
+        let qubit_ctx = server_ctx.clone();
         let handle_commands = async move {
             process_stdin_commands(qubit_ctx).await.unwrap();
         };
@@ -282,7 +280,7 @@ async fn main() {
     tracker.wait().await;
 }
 
-async fn run_match_now(ctx: QubitCtx) -> anyhow::Result<()> {
+async fn run_match_now(ctx: ServerCtx) -> anyhow::Result<()> {
     // Is there an incomplete one to keep running?
     let match_manager = match MatchConfig::get_incomplete(&ctx.db).await? {
         // If so then just load it now
@@ -335,7 +333,7 @@ async fn run_match_now(ctx: QubitCtx) -> anyhow::Result<()> {
     tick_loop(ctx).await
 }
 
-async fn tick_loop(ctx: QubitCtx) -> anyhow::Result<()> {
+async fn tick_loop(ctx: ServerCtx) -> anyhow::Result<()> {
     // Start the tick loop
     info!("Starting main tick loop");
     let mut tick_count = 0;

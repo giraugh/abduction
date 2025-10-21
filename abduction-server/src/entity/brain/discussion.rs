@@ -1,6 +1,5 @@
 use rand::seq::IndexedRandom;
 use serde::Serialize;
-use tokio::sync::broadcast;
 use tracing::warn;
 
 use crate::{
@@ -9,7 +8,7 @@ use crate::{
         Entity,
     },
     logs::{GameLog, GameLogBody},
-    mtch::MatchConfig,
+    mtch::ActionCtx,
 };
 
 /// Actions relevant only during the "Discussion" focus
@@ -69,9 +68,7 @@ impl Entity {
     pub fn resolve_discussion_action(
         &mut self,
         action: &DiscussionAction,
-        all_entities: &Vec<Entity>,
-        config: &MatchConfig,
-        log_tx: &broadcast::Sender<GameLog>,
+        ctx: &ActionCtx,
     ) -> PlayerActionResult {
         // Get a reference to the discussion focus
         let Some(PlayerFocus::Discussion {
@@ -85,7 +82,7 @@ impl Entity {
 
         // if other is no longer in the discussion, we need to leave too
         // and discard whatever we were going to do
-        let Some(with_entity) = all_entities.iter().find(|e| e.entity_id == *with) else {
+        let Some(with_entity) = ctx.all_entities.iter().find(|e| e.entity_id == *with) else {
             warn!("Entity being discussed with does not exist");
             self.attributes.focus = Some(PlayerFocus::Unfocused);
             return PlayerActionResult::NoEffect;
@@ -111,13 +108,11 @@ impl Entity {
         // discarding what we do otherwise
         if *interest == 0 {
             self.attributes.focus = Some(PlayerFocus::Unfocused);
-            log_tx
-                .send(GameLog::entity_pair(
-                    self,
-                    with_entity,
-                    GameLogBody::EntityFarewell,
-                ))
-                .unwrap();
+            ctx.send_log(GameLog::entity_pair(
+                self,
+                with_entity,
+                GameLogBody::EntityFarewell,
+            ));
 
             return PlayerActionResult::NoEffect;
         }
@@ -129,13 +124,11 @@ impl Entity {
                 *interest = interest.saturating_sub(2);
 
                 // send log
-                log_tx
-                    .send(GameLog::entity_pair(
-                        self,
-                        with_entity,
-                        GameLogBody::EntityLoseInterest,
-                    ))
-                    .unwrap();
+                ctx.send_log(GameLog::entity_pair(
+                    self,
+                    with_entity,
+                    GameLogBody::EntityLoseInterest,
+                ))
             }
             DiscussionAction::LightChat | DiscussionAction::HeavyChat => {
                 // Determine topic
@@ -154,15 +147,13 @@ impl Entity {
                 self.relations.increase_associate_bond(with);
 
                 // send log
-                log_tx
-                    .send(GameLog::entity_pair(
-                        self,
-                        with_entity,
-                        GameLogBody::EntityChat {
-                            topic: topic.clone(),
-                        },
-                    ))
-                    .unwrap();
+                ctx.send_log(GameLog::entity_pair(
+                    self,
+                    with_entity,
+                    GameLogBody::EntityChat {
+                        topic: topic.clone(),
+                    },
+                ));
             }
         }
 
