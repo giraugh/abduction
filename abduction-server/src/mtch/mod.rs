@@ -25,8 +25,8 @@ use tracing::info;
 
 use crate::{
     entity::{
-        gen::generate_player, world::EntityWorld, Entity, EntityAttributes, EntityManager,
-        EntityManagerMutation,
+        gen::generate_player, snapshot::EntityView, world::EntityWorld, Entity, EntityAttributes,
+        EntityManager, EntityManagerMutation,
     },
     event::{EventStore, EventsView, GameEvent},
     has_markers,
@@ -48,8 +48,8 @@ pub type TickId = usize;
 /// basically, points at stuff on the match
 #[derive(Debug)]
 pub struct ActionCtx<'a> {
-    pub all_entities: &'a Vec<Entity>,
-    pub events_view: &'a EventsView<'a>,
+    pub entities: &'a EntityView<'a>,
+    pub events: &'a EventsView<'a>,
     pub config: &'a MatchConfig,
     pub current_world_state: &'a EntityWorld,
 
@@ -176,10 +176,10 @@ impl MatchManager {
         player_count <= 1
     }
 
-    fn maybe_next_world_state(&mut self, all_entities: &[Entity], ctx: &ServerCtx) -> EntityWorld {
+    fn maybe_next_world_state(&mut self, entity_view: &EntityView, ctx: &ServerCtx) -> EntityWorld {
         let mut rng = rand::rng();
-        let mut world_entity = all_entities
-            .iter()
+        let mut world_entity = entity_view
+            .all()
             .find(|e| e.attributes.world.is_some())
             .expect("Expected world entity to exist")
             .clone();

@@ -1,6 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-use crate::entity::EntityId;
+use crate::entity::{
+    brain::{
+        characteristic::Characteristic, discussion::DiscussionAction, player_action::PlayerAction,
+        signal::Signal,
+    },
+    EntityId,
+};
 
 /// Entities can focus on a certain task or objective. They can also pull other entities into a focus, affecting both of them.
 /// When a focus is active, the action-selection logic is unique.
@@ -31,4 +37,33 @@ pub enum PlayerFocus {
         /// at 0, we stop the conversation (not rude per se)
         interest: usize,
     },
+}
+
+impl Signal for PlayerFocus {
+    fn act_on(
+        &self,
+        ctx: &super::signal::SignalContext,
+        actions: &mut super::signal::WeightedPlayerActions,
+    ) {
+        match self {
+            PlayerFocus::Unfocused => {}
+            PlayerFocus::Sleeping { remaining_turns } => {}
+            PlayerFocus::Discussion { with, interest } => {
+                let friendliness = ctx.entity.characteristic(Characteristic::Friendliness);
+
+                // For now just chat
+                actions.add(10, PlayerAction::Discussion(DiscussionAction::LightChat));
+
+                // or chat about something heavier if more interested & friendly
+                if *interest > 5 && friendliness.is_high() {
+                    actions.add(20, PlayerAction::Discussion(DiscussionAction::HeavyChat));
+                }
+
+                // And if less friendly, also lose interest potentially
+                if !friendliness.is_high() {
+                    actions.add(5, PlayerAction::Discussion(DiscussionAction::LoseInterest));
+                }
+            }
+        }
+    }
 }

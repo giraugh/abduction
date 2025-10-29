@@ -7,7 +7,10 @@ use tracing::debug;
 
 use crate::{
     entity::{
-        brain::{characteristic::Characteristic, signal::SignalRef},
+        brain::{
+            characteristic::{Characteristic, CharacteristicStrength},
+            signal::SignalRef,
+        },
         Entity, EntityId,
     },
     hex::AxialHex,
@@ -38,6 +41,32 @@ pub enum NoticeCondition {
     },
 }
 
+impl NoticeCondition {
+    /// Test whether some entity meets the condition given an event location
+    pub fn test(&self, location: AxialHex, entity: &Entity) -> bool {
+        match self {
+            NoticeCondition::Sense {
+                max_dist,
+                characteristic,
+            } => {
+                // Need a hex to check dist
+                let Some(entity_hex) = entity.attributes.hex else {
+                    return false;
+                };
+
+                // Check max dist
+                let dist = entity_hex.dist_to(location);
+                if dist > (*max_dist as isize) {
+                    return false;
+                }
+
+                // Check characteristic
+                entity.characteristic(*characteristic) >= CharacteristicStrength::Average
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum GameEventKind {
     /// Some entity arrives in a new hex
@@ -45,6 +74,9 @@ pub enum GameEventKind {
 
     /// Some entity leaves a given hex
     LeaveHex { entity_id: EntityId },
+
+    /// Some entity dies
+    Death { entity_id: EntityId },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

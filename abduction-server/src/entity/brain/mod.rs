@@ -6,16 +6,14 @@ pub mod player_action;
 pub mod signal;
 
 use itertools::Itertools;
-use rand::{
-    distr::{weighted::WeightedIndex, Distribution},
-    seq::{IndexedRandom, IteratorRandom},
-};
+use rand::seq::{IndexedRandom, IteratorRandom};
 use tracing::warn;
 
 use crate::{
     entity::{
         brain::{
             characteristic::{Characteristic, CharacteristicStrength},
+            motivator::Sadness,
             player_action::{PlayerAction, PlayerActionResult, PlayerActionSideEffect},
             signal::{Signal, SignalContext, SignalRef, WeightedPlayerActions},
         },
@@ -24,7 +22,7 @@ use crate::{
     event::{builder::GameEventBuilder, GameEventKind, GameEventTarget},
     has_markers,
     hex::AxialHexDirection,
-    logs::{GameLog, GameLogBody},
+    logs::{AsEntityId, GameLog, GameLogBody},
     mtch::ActionCtx,
 };
 use focus::PlayerFocus;
@@ -34,25 +32,30 @@ impl Entity {
     /// Only applicable for players
     pub fn get_next_action<'a>(
         &'a self,
+        ctx: &ActionCtx,
         event_signals: impl Iterator<Item = SignalRef<'a>>,
     ) -> PlayerAction {
         // Build the context for acting (WIP)
-        let ctx = SignalContext {
-            focus: self
-                .attributes
-                .focus
-                .as_ref()
-                .cloned()
-                .unwrap_or(PlayerFocus::Unfocused),
+        let current_focus = self
+            .attributes
+            .focus
+            .as_ref()
+            .cloned()
+            .unwrap_or(PlayerFocus::Unfocused);
+        let signal_ctx = SignalContext {
+            entities: ctx.entities,
+            entity: self,
+            focus: current_focus.clone(),
         };
 
         // Collect signals
+        let focus_signal = std::iter::once(SignalRef::boxed(current_focus));
         let motivator_signals = self.attributes.motivators.as_signals();
-        let signals = itertools::chain!(motivator_signals, event_signals);
+        let signals = itertools::chain!(motivator_signals, event_signals, focus_signal);
 
         // Then resolve them into actions
         let mut actions = WeightedPlayerActions::default();
-        signals.for_each(|signal| signal.act_on(&ctx, &mut actions));
+        signals.for_each(|signal| signal.act_on(&signal_ctx, &mut actions));
         actions.sample(&mut rand::rng())
     }
 
@@ -63,6 +66,20 @@ impl Entity {
     ) -> PlayerActionResult {
         match &action {
             PlayerAction::Nothing => {
+                return PlayerActionResult::NoEffect;
+            }
+
+            // Just send a log
+            PlayerAction::Log { other, body } => {
+                match other {
+                    Some(other) => {
+                        ctx.send_log(GameLog::entity_pair(self, other, body.clone()));
+                    }
+                    None => {
+                        ctx.send_log(GameLog::entity(self, body.clone()));
+                    }
+                }
+
                 return PlayerActionResult::NoEffect;
             }
 
@@ -159,6 +176,15 @@ impl Entity {
             PlayerAction::Death => {
                 ctx.send_log(GameLog::entity(self, GameLogBody::EntityDeath));
 
+                // Raise event
+                GameEventBuilder::new()
+                    .of_kind(GameEventKind::Death {
+                        entity_id: self.id().clone(),
+                    })
+                    .with_physical_senses(0)
+                    .targets_hex_of(self)
+                    .add(ctx);
+
                 return PlayerActionResult::SideEffect(PlayerActionSideEffect::Death);
             }
 
@@ -167,13 +193,9 @@ impl Entity {
 
                 // Get entities at my location with that marker
                 let avoid_entities = ctx
-                    .all_entities
-                    .iter()
-                    .filter(|e| {
-                        e.entity_id != self.entity_id
-                            && e.attributes.hex.is_some()
-                            && e.attributes.hex == self.attributes.hex
-                    })
+                    .entities
+                    .in_hex(self.attributes.hex.expect("Expected hex"))
+                    .filter(|e| e.entity_id != self.entity_id)
                     .filter(|e| markers.iter().any(|m| e.markers.contains(m)))
                     .collect_vec();
 
@@ -203,11 +225,10 @@ impl Entity {
                 };
 
                 // Is the current hex such a hex?
-                let current_hex_valid = ctx.all_entities.iter().any(|e| {
-                    e.attributes.hex.is_some()
-                        && e.attributes.hex == Some(my_hex)
-                        && markers.iter().any(|m| e.markers.contains(m))
-                });
+                let current_hex_valid = ctx
+                    .entities
+                    .in_hex(my_hex)
+                    .any(|e| markers.iter().any(|m| e.markers.contains(m)));
 
                 if current_hex_valid {
                     return PlayerActionResult::NoEffect;
@@ -215,12 +236,8 @@ impl Entity {
 
                 // If not, pull all applicable adjacent entities
                 let adj_entities = ctx
-                    .all_entities
-                    .iter()
-                    .filter(|e| match e.attributes.hex {
-                        None => false,
-                        Some(hex) => hex.is_adjacent(my_hex),
-                    })
+                    .entities
+                    .adjacent_to_hex(my_hex)
                     .filter(|e| markers.iter().any(|m| e.markers.contains(m)))
                     .collect_vec();
 
@@ -252,11 +269,10 @@ impl Entity {
                 };
 
                 // Is the current hex such a hex?
-                let current_hex_valid = ctx.all_entities.iter().any(|e| {
-                    e.attributes.hex.is_some()
-                        && e.attributes.hex == Some(my_hex)
-                        && markers.iter().any(|m| e.markers.contains(m))
-                });
+                let current_hex_valid = ctx
+                    .entities
+                    .in_hex(my_hex)
+                    .any(|e| markers.iter().any(|m| e.markers.contains(m)));
 
                 if current_hex_valid {
                     return PlayerActionResult::NoEffect;
@@ -264,8 +280,8 @@ impl Entity {
 
                 // If not, pull all applicable entities
                 let target_entities = ctx
-                    .all_entities
-                    .iter()
+                    .entities
+                    .all()
                     .filter(|e| markers.iter().any(|m| e.markers.contains(m)))
                     .collect_vec();
 
@@ -318,11 +334,8 @@ impl Entity {
                 // Is there food at this location?
                 let mut rng = rand::rng();
                 let food_entities = ctx
-                    .all_entities
-                    .iter()
-                    .filter(|e| {
-                        e.attributes.hex.is_some() && e.attributes.hex == self.attributes.hex
-                    })
+                    .entities
+                    .in_hex(self.attributes.hex.unwrap())
                     .filter(|e| match e.attributes.food {
                         // Is it food at all?
                         None => false,
@@ -385,15 +398,35 @@ impl Entity {
                 ));
             }
 
+            // NOTE: entity may not exist at this point
+            PlayerAction::Mourn { entity_id } => {
+                // Get sad
+                self.attributes.motivators.bump::<Sadness>();
+
+                // Find the corpse
+                let maybe_corpse_entity = ctx
+                    .entities
+                    .all()
+                    .find(|e| e.attributes.corpse == Some(entity_id.clone()));
+
+                // And log
+                if let Some(corpse_entity) = maybe_corpse_entity {
+                    ctx.send_log(GameLog::entity_pair(
+                        self,
+                        corpse_entity,
+                        GameLogBody::EntityMournOverCorpse,
+                    ));
+                } else {
+                    warn!("NO CORPSE");
+                }
+            }
+
             PlayerAction::DrinkFromWaterSource { try_dubious } => {
                 // Is there food at this location?
                 let mut rng = rand::rng();
                 let water_source_entities = ctx
-                    .all_entities
-                    .iter()
-                    .filter(|e| {
-                        e.attributes.hex.is_some() && e.attributes.hex == self.attributes.hex
-                    })
+                    .entities
+                    .in_hex(self.attributes.hex.unwrap())
                     .filter(|e| match e.attributes.water_source {
                         // its dubious, are we okay with that?
                         Some(EntityWaterSource { poison }) if poison > 0.0 => *try_dubious,
@@ -442,88 +475,91 @@ impl Entity {
                 return PlayerActionResult::Ok;
             }
 
-            PlayerAction::TalkWithBeing { try_cannot_respond } => {
-                let being_entities = ctx
-                    .all_entities
-                    .iter()
-                    .filter(|e| {
-                        e.attributes.hex.is_some()
-                            && e.attributes.hex == self.attributes.hex
-                            && e.entity_id != self.entity_id
-                    })
-                    .filter(
-                        |e| match (has_markers!(e, CanTalk), has_markers!(e, Being)) {
-                            // If its a human, always yes
-                            (true, _) => true,
+            PlayerAction::Greet { entity_id } => {
+                // let being_entities = ctx
+                //     .entities
+                //     .in_hex(self.attributes.hex.unwrap())
+                //     .filter(|e| e.entity_id != self.entity_id)
+                //     .filter(
+                //         |e| match (has_markers!(e, CanTalk), has_markers!(e, Being)) {
+                //             // If its a human, always yes
+                //             (true, _) => true,
 
-                            // Otherwise, if we are okay w/ non responders then yes
-                            (_, true) => *try_cannot_respond,
+                //             // Otherwise, if we are okay w/ non responders then yes
+                //             (_, true) => *try_cannot_respond,
 
-                            // Otherwise don't talk with it
-                            _ => false,
-                        },
-                    );
+                //             // Otherwise don't talk with it
+                //             _ => false,
+                //         },
+                //     );
 
-                // If no applicable being, there's no effect
-                let mut rng = rand::rng();
-                let Some(being_entity) = being_entities.choose(&mut rng) else {
-                    return PlayerActionResult::NoEffect;
-                };
+                // // If no applicable being, there's no effect
+                // let mut rng = rand::rng();
+                // let Some(being_entity) = being_entities.choose(&mut rng) else {
+                //     return PlayerActionResult::NoEffect;
+                // };
+
+                let entity = ctx.entities.by_id(entity_id).unwrap();
 
                 // Is there an established association relation?
-                let association_bond_strength = self
-                    .relations
-                    .get_associate(&being_entity.entity_id)
-                    .map(|associate| associate.bond)
-                    .unwrap_or(0.0);
+                let bond = self.relations.bond(entity_id);
 
                 // Log
                 ctx.send_log(GameLog::entity_pair(
                     self,
-                    being_entity,
+                    entity,
                     GameLogBody::EntityGreet {
-                        bond: association_bond_strength,
+                        bond,
+                        response: false,
                     },
                 ));
 
                 // If they are unfriendly, this goes differently
                 // NOTE: if they dont have motivators, we assume they are friendly (assuming that animals etc are friendly)
                 // TODO: probably want to have a tag for beings that inverts this assumption (e.g Predator or something)
-                let friendliness = being_entity.characteristic(Characteristic::Friendliness);
+                let friendliness = entity.characteristic(Characteristic::Friendliness);
                 if friendliness < CharacteristicStrength::Average {
                     // they ignore us
                     ctx.send_log(GameLog::entity_pair(
-                        being_entity,
+                        entity,
                         &self.entity_id,
                         GameLogBody::EntityIgnore,
                     ));
 
                     // And we like them less
-                    self.relations
-                        .decrease_associate_bond(&being_entity.entity_id);
+                    self.relations.decrease_associate_bond(&entity.entity_id);
                 } else {
                     // Just them responding makes us like them
-                    self.relations
-                        .increase_associate_bond(&being_entity.entity_id);
+                    self.relations.increase_associate_bond(&entity.entity_id);
 
                     // And if they can respond, we start a chat with them
-                    if has_markers!(being_entity, CanTalk) {
+                    if has_markers!(entity, CanTalk) {
                         // And we start talking to them
                         // Initial interest scales w/ bond but has a minimum
                         // (for simplicity our interest starts the same as theirs in the convo)
                         let max_interest = 20f32;
-                        let interest = ((association_bond_strength * max_interest) as usize)
-                            .clamp(2, max_interest as usize);
+                        let interest =
+                            ((bond * max_interest) as usize).clamp(2, max_interest as usize);
+
+                        // Log the greet response
+                        ctx.send_log(GameLog::entity_pair(
+                            entity,
+                            self.id(),
+                            GameLogBody::EntityGreet {
+                                bond,
+                                response: true,
+                            },
+                        ));
 
                         // Set our focus
                         self.attributes.focus = Some(PlayerFocus::Discussion {
-                            with: being_entity.entity_id.clone(),
+                            with: entity_id.clone(),
                             interest,
                         });
 
                         // TODO: maybe there's a strat here where we force them to do a "talk" action w/ us instead
                         return PlayerActionResult::SideEffect(PlayerActionSideEffect::SetFocus {
-                            entity_id: being_entity.entity_id.clone(),
+                            entity_id: entity_id.clone(),
                             focus: PlayerFocus::Discussion {
                                 with: self.entity_id.clone(),
                                 interest,
@@ -554,8 +590,7 @@ impl Entity {
                             entity_id: self.entity_id.clone(),
                         })
                         .targets(GameEventTarget::Hex(*hex))
-                        .with_sense(Characteristic::Vision, 0)
-                        .with_sense(Characteristic::Hearing, 0)
+                        .with_physical_senses(0)
                         .add(ctx);
                     GameEventBuilder::new()
                         .of_kind(GameEventKind::ArriveInHex {

@@ -1,6 +1,7 @@
 use anyhow::Context;
 use rand::prelude::*;
 use std::collections::HashMap;
+#[cfg(not(test))]
 use std::env;
 use std::fs::{self, File};
 use std::io::{BufReader, Read, Seek};
@@ -14,6 +15,11 @@ use crate::entity::brain::motivator::MotivatorTable;
 use crate::entity::{Entity, EntityAttributes};
 use crate::hex::AxialHex;
 
+#[cfg(test)]
+static PLAYER_DATA_DIR: LazyLock<PathBuf> =
+    LazyLock::new(|| "../gather-player-data/output/".into());
+
+#[cfg(not(test))]
 static PLAYER_DATA_DIR: LazyLock<PathBuf> =
     LazyLock::new(|| env::var("PLAYER_DATA_PATH").unwrap().into());
 
@@ -190,7 +196,6 @@ mod test {
     #[test]
     fn test_generate_player() {
         generate_player().unwrap();
-        panic!();
     }
 
     #[test]

@@ -1,9 +1,10 @@
 use std::marker::PhantomData;
 
-use tokio::sync::mpsc::{self};
-
 use super::{GameEvent, GameEventKind, GameEventTarget, NoticeCondition};
-use crate::{entity::brain::characteristic::Characteristic, mtch::ActionCtx};
+use crate::{
+    entity::{brain::characteristic::Characteristic, Entity},
+    mtch::ActionCtx,
+};
 
 pub struct Yes;
 pub struct No;
@@ -50,6 +51,22 @@ impl<K: _P, T: _P> GameEventBuilder<K, T> {
             _k: PhantomData,
             _t: PhantomData,
         }
+    }
+
+    pub fn targets_hex_of(self, entity: &Entity) -> GameEventBuilder<K, Yes> {
+        GameEventBuilder {
+            target: Some(GameEventTarget::Hex(entity.attributes.hex.unwrap())),
+            kind: self.kind,
+            notice_conditions: self.notice_conditions,
+            _k: PhantomData,
+            _t: PhantomData,
+        }
+    }
+
+    /// Add hearing+vision senses with 0 distance
+    pub fn with_physical_senses(self, max_dist: usize) -> Self {
+        self.with_sense(Characteristic::Hearing, max_dist)
+            .with_sense(Characteristic::Vision, max_dist)
     }
 
     pub fn with_sense(self, characteristic: Characteristic, max_dist: usize) -> Self {

@@ -22,12 +22,20 @@ pub enum PlayerAction {
     /// Try each action in the list until one works
     Sequential(Vec<PlayerAction>),
 
-    /// Talk to some being at current location
-    /// (if other entity can_respond, will enter a discussion focus)
-    TalkWithBeing {
-        /// Also talk to e.g animals?
-        try_cannot_respond: bool,
+    /// Greet some specific entity
+    /// (go up to them and say hello type beat)
+    /// the other entity may or may not respond, and if they `can_talk` then this may
+    /// start a discussion focus
+    Greet { entity_id: EntityId },
+
+    Log {
+        other: Option<EntityId>,
+        body: GameLogBody,
     },
+
+    /// Mourn the death of another entity
+    /// (get sad, have a little vigil etc)
+    Mourn { entity_id: EntityId },
 
     /// When in a discussion focus, do related actions
     Discussion(DiscussionAction),

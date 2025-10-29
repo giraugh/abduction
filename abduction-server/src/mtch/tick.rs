@@ -3,13 +3,14 @@ use rand::{seq::IndexedRandom, Rng};
 
 use crate::{
     create_markers,
-    entity::gen::generate_corpse,
     entity::{
         brain::{
-            motivator,
+            motivator::{self, Hurt},
             player_action::{PlayerActionResult, PlayerActionSideEffect},
         },
-        world::{EntityWorld, WeatherKind},
+        gen::generate_corpse,
+        snapshot::{EntitySnapshot, EntityView},
+        world::{EntityWorld, TimeOfDay, WeatherKind},
         Entity, EntityAttributes, EntityHazard,
     },
     has_markers,
@@ -27,15 +28,18 @@ impl MatchManager {
         // this is our copy for performing this tick
         // NOTE: that entities wont be updated in here, so every entity kind of sees a frozen copy of the world
         //       until the next tick
-        let all_entities = self.entities.get_all_entities().cloned().collect_vec();
+        // let all_entities = self.entities.get_all_entities().cloned().collect_vec();
+        let entity_snapshot =
+            EntitySnapshot::new(self.entities.get_all_entities().cloned().collect_vec());
+        let entities_view = entity_snapshot.view();
 
         // Perform world updates
         // i.e next time/weather
-        let current_world_state = self.maybe_next_world_state(&all_entities, ctx);
+        let current_world_state = self.maybe_next_world_state(&entities_view, ctx);
 
         // Do global effects
         // (i.e that dont target specific players at random, just stuff everywhere)
-        self.resolve_global_world_effects(&all_entities, &current_world_state, ctx);
+        self.resolve_global_world_effects(&entities_view, &current_world_state, ctx);
 
         // Prepare a view for the events this tick
         // and a buffer of pending events
@@ -44,8 +48,8 @@ impl MatchManager {
 
         // Build the context which we pass to each resolution method
         let mut action_ctx = ActionCtx {
-            all_entities: &all_entities,
-            events_view: &events,
+            entities: &entities_view,
+            events: &events,
             log_tx: &ctx.log_tx,
             config: &self.config,
             current_world_state: &current_world_state,
@@ -55,10 +59,10 @@ impl MatchManager {
         // Lets just attempt to implement the main entity loop and see how we go I guess?
         // Rough plan is that each hex has one player action - the player who acted last acts now
         // This is encoded as the player with the highest `TicksWaited` attribute
-        let players_in_hexes = all_entities
-            .clone()
-            .into_iter()
+        let players_in_hexes = entities_view
+            .all()
             .filter(|e| has_markers!(e, Player))
+            .cloned()
             .into_group_map_by(|e| e.attributes.hex.unwrap());
         for (_hex, players) in players_in_hexes {
             let mut rng = rand::rng();
@@ -126,7 +130,7 @@ impl MatchManager {
     // e.g spawn in hazards
     fn resolve_global_world_effects(
         &mut self,
-        all_entities: &[Entity],
+        entities_view: &EntityView,
         current_world_state: &EntityWorld,
         ctx: &ServerCtx,
     ) {
@@ -163,7 +167,7 @@ impl MatchManager {
 
         // Rain putting out fires
         if current_world_state.weather.rain_proc_chance_scale() > 0.0 {
-            for entity in all_entities {
+            for entity in entities_view.all() {
                 if has_markers!(entity, Fire) && rng.random_bool(0.05) {
                     self.entities.remove_entity(&entity.entity_id).unwrap();
 
@@ -292,7 +296,7 @@ impl MatchManager {
                 player
                     .attributes
                     .motivators
-                    .bump_scaled::<motivator::Hurt>(5.0);
+                    .bump_scaled::<motivator::Hurt>(20.0);
 
                 // Emit log
                 ctx.send_log(GameLog::entity(player, GameLogBody::EntityHitByLightning))
@@ -300,8 +304,10 @@ impl MatchManager {
         }
 
         // Or tired?
-        // TODO: more at night
-        if rng.random_bool(0.005) {
+        // (more at night)
+        if rng.random_bool(0.005)
+            || (ctx.current_world_state.time_of_day == TimeOfDay::Night && rng.random_bool(0.01))
+        {
             player.attributes.motivators.bump::<motivator::Tiredness>();
         }
     }
@@ -311,8 +317,8 @@ impl MatchManager {
         player: &mut Entity,
         ctx: &mut ActionCtx,
     ) -> Option<PlayerActionSideEffect> {
-        let events = ctx.events_view.get_event_signals_for_entity(player);
-        let action = player.get_next_action(events);
+        let events = ctx.events.get_event_signals_for_entity(player);
+        let action = player.get_next_action(ctx, events);
         let result = player.resolve_action(action, ctx);
 
         // TODO: perhaps if the resolved action had no effect, I could let them try again N times?

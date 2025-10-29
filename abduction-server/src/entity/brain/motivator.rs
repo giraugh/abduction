@@ -57,6 +57,7 @@ pub enum MotivatorInit {
     Random,
 
     /// Random 0-1 but split into N levels
+    #[allow(unused)]
     RandomDiscrete(usize),
 }
 

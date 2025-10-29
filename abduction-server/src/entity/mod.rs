@@ -1,6 +1,7 @@
 pub mod brain;
 pub mod gen;
 pub mod manager;
+pub mod snapshot;
 pub mod world;
 
 use std::collections::HashMap;
@@ -132,6 +133,28 @@ impl EntityRelations {
         self.associates
             .as_mut()
             .and_then(|associates| associates.get_mut(entity_id))
+    }
+
+    /// Whether we actively like a given entity
+    /// (i.e have a positive non-zero bond)
+    pub fn bond(&self, entity_id: &EntityId) -> f32 {
+        self.associates
+            .as_ref()
+            .and_then(|a| a.get(entity_id))
+            .map(|a| a.bond)
+            .unwrap_or_default()
+    }
+
+    /// Whether we dislike a given entity
+    /// (i.e have a negative bond)
+    pub fn dislike(&self, entity_id: &EntityId) -> bool {
+        self.bond(entity_id) < 0.0
+    }
+
+    /// Whether we actively like a given entity
+    /// (i.e have a positive non-zero bond)
+    pub fn like(&self, entity_id: &EntityId) -> bool {
+        self.bond(entity_id) > 0.0
     }
 
     /// Create a new associate relation if it doesnt exist, otherwise strengthen it

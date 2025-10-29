@@ -82,7 +82,7 @@ impl Entity {
 
         // if other is no longer in the discussion, we need to leave too
         // and discard whatever we were going to do
-        let Some(with_entity) = ctx.all_entities.iter().find(|e| e.entity_id == *with) else {
+        let Some(with_entity) = ctx.entities.by_id(with) else {
             warn!("Entity being discussed with does not exist");
             self.attributes.focus = Some(PlayerFocus::Unfocused);
             return PlayerActionResult::NoEffect;

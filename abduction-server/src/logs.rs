@@ -75,6 +75,18 @@ impl AsEntityId for &Entity {
     }
 }
 
+impl AsEntityId for &mut Entity {
+    fn id(&self) -> &EntityId {
+        &self.entity_id
+    }
+}
+
+impl<T: AsRef<Entity>> AsEntityId for T {
+    fn id(&self) -> &EntityId {
+        &self.as_ref().entity_id
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[qubit::ts]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -93,7 +105,7 @@ pub enum GameLogBody {
 
     /// Primary entity greets a secondary entity
     /// Includes the bond between them (0 -> unknown before this, 0.5 -> have talked a few times, 1 -> friendly etc)
-    EntityGreet { bond: f32 },
+    EntityGreet { bond: f32, response: bool },
 
     /// Primary entity says farewell to secondary entity
     EntityFarewell,
@@ -112,6 +124,12 @@ pub enum GameLogBody {
 
     /// Primary entity is avoiding the secondary entity (because they are misanthropic)
     EntityAvoid,
+
+    /// Primary entity mourns the death of a corpse secondary entity,
+    EntityMournOverCorpse,
+
+    /// Primary entity is saddened by death (does not point at the corpse entity)
+    EntityUpsetByDeath,
 
     /// Lightning strikes the ground and creates a fire
     LightningStrike,

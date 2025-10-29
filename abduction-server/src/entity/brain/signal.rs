@@ -1,10 +1,22 @@
 use rand::distr::{weighted::WeightedIndex, Distribution};
 
-use crate::entity::brain::{focus::PlayerFocus, player_action::PlayerAction};
+use crate::entity::{
+    brain::{focus::PlayerFocus, player_action::PlayerAction},
+    snapshot::EntityView,
+    Entity,
+};
 
 /// Information available when resolving a signal into actions
-#[derive(Debug, Clone)]
-pub struct SignalContext {
+/// (Extends the action context)
+#[derive(Debug)]
+pub struct SignalContext<'a> {
+    /// A view of all entities from the snapshot
+    pub entities: &'a EntityView<'a>,
+
+    /// The entity having its signal resolved
+    pub entity: &'a Entity,
+
+    /// The current focus of the entity having its signal resolved
     pub focus: PlayerFocus,
 }
 

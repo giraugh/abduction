@@ -180,10 +180,25 @@ export function logMessage(log: GameLog, game: Game) {
 	}
 
 	if (log.kind === 'entity_greet') {
-		if (log.bond === 0) return `${primaryName} waves at ${secondaryName}`;
-		else if (log.bond < 0.3) return `${primaryName} nods at ${secondaryName}`;
-		else if (log.bond < 0.6) return `${primaryName} greets ${secondaryName}`;
-		else return `${primaryName} hugs ${secondaryName}`;
+		if (log.response) {
+			if (log.bond === 0) return `${primaryName} waves back at ${secondaryName}`;
+			else if (log.bond < 0.3) return `${primaryName} nods back at ${secondaryName}`;
+			else if (log.bond < 0.6) return `${primaryName} verbally greets ${secondaryName} back`;
+			else return `${primaryName} hugs ${secondaryName} back`;
+		} else {
+			if (log.bond === 0) return `${primaryName} waves at ${secondaryName}`;
+			else if (log.bond < 0.3) return `${primaryName} nods at ${secondaryName}`;
+			else if (log.bond < 0.6) return `${primaryName} verbally greets ${secondaryName}`;
+			else return `${primaryName} hugs ${secondaryName}`;
+		}
+	}
+
+	if (log.kind === 'entity_mourn_over_corpse') {
+		return `${primaryName} has a quiet vigil for ${secondaryName.replaceAll('Corpse of', '')}`;
+	}
+
+	if (log.kind === 'entity_upset_by_death') {
+		return `${primaryName} is upset by witnessing death`;
 	}
 
 	if (log.kind === 'entity_chat') {

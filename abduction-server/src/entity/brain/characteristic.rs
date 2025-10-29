@@ -4,10 +4,21 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[qubit::ts]
 pub enum CharacteristicStrength {
-    High,
+    Low,
     #[default]
     Average,
-    Low,
+    High,
+}
+
+impl CharacteristicStrength {
+    pub fn is_high(&self) -> bool {
+        *self == CharacteristicStrength::High
+    }
+
+    #[allow(unused)]
+    pub fn is_low(&self) -> bool {
+        *self == CharacteristicStrength::Low
+    }
 }
 
 /// An entity can have a set of these with varying strengths
@@ -80,5 +91,15 @@ impl Characteristic {
                 | Characteristic::Vision
                 | Characteristic::Hearing
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn char_strength_order() {
+        assert!(CharacteristicStrength::Low < CharacteristicStrength::High);
     }
 }
