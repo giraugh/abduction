@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use rand::distr::{weighted::WeightedIndex, Distribution};
 
 use crate::entity::{

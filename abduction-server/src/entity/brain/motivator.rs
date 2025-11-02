@@ -238,7 +238,8 @@ impl Signal for Hunger {
                     actions.add(
                         if self.motivation() > 0.7 { 30 } else { 10 },
                         PlayerAction::Sequential(seq![
-                            PlayerAction::ConsumeFood { try_dubious: false, try_morally_wrong: false };
+                            PlayerAction::ConsumeNearbyFood { try_dubious: false, try_morally_wrong: false },
+                            PlayerAction::RetrieveInventoryFood;
                             ..seek_food_plan,
                         ]),
                     );
@@ -249,8 +250,9 @@ impl Signal for Hunger {
                     actions.add(
                                 if self.motivation() > 0.7 { 30 } else { 10 },
                                 PlayerAction::Sequential(seq![
-                                    PlayerAction::ConsumeFood { try_dubious: false, try_morally_wrong: false },
-                                    PlayerAction::ConsumeFood { try_dubious: true, try_morally_wrong: false };
+                                    PlayerAction::ConsumeNearbyFood { try_dubious: false, try_morally_wrong: false },
+                                    PlayerAction::RetrieveInventoryFood,
+                                    PlayerAction::ConsumeNearbyFood { try_dubious: true, try_morally_wrong: false };
                                     ..seek_food_plan,
                                 ]),
                             );
@@ -260,7 +262,7 @@ impl Signal for Hunger {
                 if self.motivation() > 0.9 {
                     actions.add(
                         10,
-                        PlayerAction::ConsumeFood {
+                        PlayerAction::ConsumeNearbyFood {
                             try_dubious: true,
                             try_morally_wrong: true,
                         },

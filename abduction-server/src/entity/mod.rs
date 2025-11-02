@@ -4,7 +4,7 @@ pub mod manager;
 pub mod snapshot;
 pub mod world;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub use manager::*;
 
@@ -20,6 +20,7 @@ use crate::{
             focus::PlayerFocus,
             motivator::MotivatorTable,
         },
+        snapshot::EntityView,
         world::EntityWorld,
     },
     hex::AxialHex,
@@ -93,6 +94,9 @@ pub struct EntityAttributes {
     /// If set, this entity is a corpse of some previous entity
     pub corpse: Option<EntityId>,
 
+    /// If set, this item is entity as a pickupable item
+    pub item: Option<EntityItem>,
+
     /// If set, this entity is a hazard which can deal damage when interacted with
     pub hazard: Option<EntityHazard>,
 
@@ -125,10 +129,22 @@ pub struct EntityAttributes {
 #[qubit::ts]
 #[ts(optional_fields)]
 pub struct EntityRelations {
+    /// Poorly named but this is like "opinion" of another entity
     associates: Option<HashMap<EntityId, EntityAssociate>>,
+
+    /// Entities being held
+    inventory: Option<HashSet<EntityId>>,
 }
 
 impl EntityRelations {
+    pub fn inventory_mut(&mut self) -> &mut HashSet<EntityId> {
+        self.inventory.get_or_insert_default()
+    }
+
+    pub fn inventory(&self) -> impl Iterator<Item = &EntityId> {
+        self.inventory.iter().flat_map(|i| i.iter())
+    }
+
     pub fn get_associate(&mut self, entity_id: &EntityId) -> Option<&mut EntityAssociate> {
         self.associates
             .as_mut()
@@ -211,6 +227,20 @@ pub struct EntityLocation {
     pub location_kind: LocationKind,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[qubit::ts]
+pub struct EntityItem {
+    /// How much inventory slots (load) this item "takes up"
+    /// abstractly represents its size and weight
+    /// most things are `1`
+    heft: usize,
+}
+
+impl Default for EntityItem {
+    fn default() -> Self {
+        Self { heft: 1 }
+    }
+}
 /// Consumable food
 /// TODO: restructure this to just have seperate sustenance and poison fields
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -320,6 +350,36 @@ impl Entity {
             .as_ref()
             .and_then(|c| c.get(&characteristic).cloned())
             .unwrap_or_default()
+    }
+
+    /// TODO: Not confident these lifetimes are right...
+    pub fn resolve_inventory<'a>(
+        &'a self,
+        entity_view: &'a EntityView<'a>,
+    ) -> impl Iterator<Item = &'a Entity> {
+        let ids = self.relations.inventory();
+        ids.filter_map(|entity_id| entity_view.by_id(entity_id))
+    }
+
+    pub fn max_inventory_load(&self) -> usize {
+        // You get load from characteristic
+        match self.characteristic(Characteristic::Strength) {
+            CharacteristicStrength::Low => 2,
+            CharacteristicStrength::Average => 3,
+            CharacteristicStrength::High => 5,
+        }
+
+        // TODO: and from having a bag etc
+    }
+
+    /// Inventory items take up "slots", of which we have an amount derived from our characteristics
+    pub fn available_inventory_load(&self, entity_view: &EntityView) -> usize {
+        let current_slots = self
+            .resolve_inventory(entity_view)
+            .filter_map(|e| e.attributes.item.as_ref().map(|i| i.heft))
+            .sum::<usize>();
+        let max_slots = self.max_inventory_load();
+        max_slots - current_slots
     }
 }
 

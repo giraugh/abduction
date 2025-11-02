@@ -28,34 +28,21 @@ Here's my ideation / notes on current game progress.
 
 -----
 
-New Motivators
- - **Empathy**
-  - Comfort a sad person
-  - Help a hurt person
-  - Grieve for corpse
- - **Exploration**
-  - Search for something
-    - Water, Food etc
-    - % chance to find it or something else
- - **Aggression**
-  - If dislike something suitably enough, attack it
- - **Planning?**
-  - Pick up resources
-  - Establish ally
-  - Ask people for memories
+Narrative Framing
+ - Introduction by a host
+ - Slowly spawn in each player along with a narrative announcement
+
+New Motivators Ideas
  - **Disease**
   - Slowly converts into sickness
   - Can spread to others
 
 Agent Mechanics
- - Focus
-   - override default action mechanism for a duration
-   - e.g sleeping, talking, fishing, travelling
-   - represent actions that take multiple ticks
-   - slowly drains "Focus" motivator
-     - limit consecutive focuses
-   - can involve other entities
-     - probably initiated using a side effect?
+ - Ability to hold items 
+   - When you pick one up, remove it from the world
+ - Goals
+   - Long term strategy that provides an ongoing signal for "what to do when nothing else to do"
+   - i.e low weight actions always present, represent projects etc
  - Memories
    - Type of relation that assigns tags to another entity
    - Can be shared w/ other entities
@@ -76,7 +63,6 @@ Agent Persistence
    - Players with corpses that are not collected are lost forever
      - If they are disintegrated, eaten, exploded etc
      - If something happens to the collector?
-
 
 Fun Misc Feature Ideas
 - Forming Allies

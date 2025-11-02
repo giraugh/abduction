@@ -125,6 +125,12 @@ pub enum GameLogBody {
     /// Primary entity is avoiding the secondary entity (because they are misanthropic)
     EntityAvoid,
 
+    /// Primary entity picked up second entity and added it to their inventory
+    EntityPickUp,
+
+    /// Primary entity retrieves the secondary entity from their inventory
+    EntityRetrieve,
+
     /// Primary entity mourns the death of a corpse secondary entity,
     EntityMournOverCorpse,
 

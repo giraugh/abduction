@@ -224,4 +224,12 @@ export function logMessage(log: GameLog, game: Game) {
 	if (log.kind === 'entity_ignore') {
 		return `${primaryName} ignores ${secondaryName}`;
 	}
+
+	if (log.kind === 'entity_pick_up') {
+		return `${primaryName} picks up ${secondaryName}`;
+	}
+
+	if (log.kind === 'entity_retrieve') {
+		return `${primaryName} gets out their ${secondaryName}`;
+	}
 }

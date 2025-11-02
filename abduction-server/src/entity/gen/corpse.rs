@@ -1,4 +1,4 @@
-use crate::entity::{Entity, EntityAttributes, EntityFood, EntityMarker};
+use crate::entity::{Entity, EntityAttributes, EntityFood, EntityItem, EntityMarker};
 
 pub fn generate_corpse(rng: &mut impl rand::Rng, player: Entity) -> Entity {
     // TODO
@@ -9,6 +9,7 @@ pub fn generate_corpse(rng: &mut impl rand::Rng, player: Entity) -> Entity {
         attributes: EntityAttributes {
             hex: player.attributes.hex,
             corpse: Some(player.entity_id),
+            item: Some(EntityItem { heft: 4 }),
             food: Some(EntityFood {
                 morally_wrong: true,
                 ..EntityFood::dubious(rng)

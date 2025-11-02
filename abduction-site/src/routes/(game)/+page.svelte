@@ -332,6 +332,30 @@
 						{/each}
 					</tbody>
 				</table>
+
+				<h3>Inventory</h3>
+				<table class="attribute-table">
+					<tbody>
+						{#if (entity?.relations?.inventory?.length ?? 0) === 0}
+							<tr><td>No items</td></tr>
+						{/if}
+						{#each entity.relations.inventory ?? [] as entityId (entityId)}
+							{@const name = game.entities.get(entityId)?.name ?? ''}
+							{#if name}
+								<tr
+									><td
+										><button
+											onclick={() => {
+												focus = { kind: 'entity', entityId };
+											}}>{name}</button
+										></td
+									></tr
+								>
+							{/if}
+						{/each}
+					</tbody>
+				</table>
+
 				<h3>Full Entity</h3>
 				<pre class="full-details"><code>
 {JSON.stringify(entity, null, 2)}

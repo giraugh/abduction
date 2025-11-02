@@ -36,7 +36,7 @@ pub enum Characteristic {
     Friendliness,
 
     /// High -> Strongly empathetic, takes on others pain
-    /// Low -> Psychopathic
+    /// Low -> Psychopathic uncaring type
     Empathy,
 
     /// High -> Picks fights for no reason

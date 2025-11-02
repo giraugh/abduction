@@ -1,6 +1,6 @@
 use crate::entity::brain::focus::PlayerFocus;
 use crate::entity::{EntityId, EntityMarker};
-use crate::hex::AxialHexDirection;
+use crate::hex::{AxialHex, AxialHexDirection};
 use crate::logs::GameLogBody;
 
 use super::discussion::DiscussionAction;
@@ -12,6 +12,12 @@ pub enum PlayerAction {
     /// "<player> twiddles their thumbs" etc
     /// (This always causes the "NoEffect" result)
     Nothing,
+
+    /// Add some specific entity to the inventory, if there is room
+    PickUpEntity(EntityId),
+
+    /// Retrieve some specific entity from the inventory
+    RetrieveEntity(EntityId),
 
     /// Increase some motivator by the sensitivity
     BumpMotivator(MotivatorKey),
@@ -26,7 +32,7 @@ pub enum PlayerAction {
     /// (go up to them and say hello type beat)
     /// the other entity may or may not respond, and if they `can_talk` then this may
     /// start a discussion focus
-    Greet { entity_id: EntityId },
+    GreetEntity { entity_id: EntityId },
 
     Log {
         other: Option<EntityId>,
@@ -35,7 +41,7 @@ pub enum PlayerAction {
 
     /// Mourn the death of another entity
     /// (get sad, have a little vigil etc)
-    Mourn { entity_id: EntityId },
+    MournEntity { entity_id: EntityId },
 
     /// When in a discussion focus, do related actions
     Discussion(DiscussionAction),
@@ -63,11 +69,17 @@ pub enum PlayerAction {
     /// Move to a new hex
     Move(AxialHexDirection),
 
-    /// Attempt to eat any food entity at current location
-    ConsumeFood {
+    /// Eat some specific food entity
+    ConsumeFoodEntity(EntityId),
+
+    /// Attempt to eat a food entity at current location
+    ConsumeNearbyFood {
         try_dubious: bool,
         try_morally_wrong: bool,
     },
+
+    /// Attempt to retrieve a food item from inventory if we have some
+    RetrieveInventoryFood,
 
     /// Keep sleeping zzzzz
     /// if not already in a sleep focus, will enter one
@@ -115,6 +127,13 @@ pub enum PlayerActionSideEffect {
 
     /// Remove some other entity (e.g when eating food)
     RemoveOther(EntityId),
+
+    /// For some entity, set its location to the provided hex
+    UnbanishOther(EntityId, AxialHex),
+
+    /// For some entity, remove its location such that it doesn't exist in the world
+    /// e.g when picking up an item, we banish it
+    BanishOther(EntityId),
 
     /// Set some other entities focus
     SetFocus {

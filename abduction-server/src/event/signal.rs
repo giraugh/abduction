@@ -62,7 +62,7 @@ impl Signal for GameEvent {
                 if we_are_friendly && !dislike {
                     actions.add(
                         20, // too low?
-                        PlayerAction::Greet {
+                        PlayerAction::GreetEntity {
                             entity_id: entity_id.clone(),
                         },
                     );
@@ -76,7 +76,7 @@ impl Signal for GameEvent {
                 {
                     actions.add(
                         40, // too low?
-                        PlayerAction::Mourn {
+                        PlayerAction::MournEntity {
                             entity_id: entity_id.clone(),
                         },
                     );

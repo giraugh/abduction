@@ -88,7 +88,7 @@ impl MatchManager {
                     // Go update it
                     match self.resolve_player_action(&mut player, &mut action_ctx) {
                         Some(PlayerActionSideEffect::Death) => {
-                            // Remove that player entity
+                            // Remove this player entity
                             self.entities.remove_entity(&player.entity_id).unwrap();
 
                             // Add a corpse
@@ -98,6 +98,26 @@ impl MatchManager {
                         }
                         Some(PlayerActionSideEffect::RemoveOther(entity_id)) => {
                             self.entities.remove_entity(&entity_id).unwrap();
+                            self.entities.upsert_entity(player).unwrap();
+                        }
+                        Some(PlayerActionSideEffect::BanishOther(entity_id)) => {
+                            // Remove the target entities hex
+                            let mut entity_to_banish =
+                                self.entities.get_entity(&entity_id).unwrap();
+                            entity_to_banish.attributes.hex = None;
+
+                            // Then update it, then update us as normal
+                            self.entities.upsert_entity(entity_to_banish).unwrap();
+                            self.entities.upsert_entity(player).unwrap();
+                        }
+                        Some(PlayerActionSideEffect::UnbanishOther(entity_id, hex)) => {
+                            // Set the target entities hex
+                            let mut entity_to_banish =
+                                self.entities.get_entity(&entity_id).unwrap();
+                            entity_to_banish.attributes.hex = Some(hex);
+
+                            // Then update it, then update us as normal
+                            self.entities.upsert_entity(entity_to_banish).unwrap();
                             self.entities.upsert_entity(player).unwrap();
                         }
                         Some(PlayerActionSideEffect::SetFocus { entity_id, focus }) => {

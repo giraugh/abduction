@@ -2,6 +2,7 @@ pub mod characteristic;
 pub mod discussion;
 pub mod focus;
 pub mod motivator;
+pub mod planning;
 pub mod player_action;
 pub mod signal;
 
@@ -51,7 +52,15 @@ impl Entity {
         // Collect signals
         let focus_signal = std::iter::once(SignalRef::boxed(current_focus));
         let motivator_signals = self.attributes.motivators.as_signals();
-        let signals = itertools::chain!(motivator_signals, event_signals, focus_signal);
+        let planning_signals = self.get_planning_signals(&signal_ctx);
+
+        // Merge all the signals into one iter
+        let signals = itertools::chain!(
+            motivator_signals,
+            event_signals,
+            focus_signal,
+            planning_signals
+        );
 
         // Then resolve them into actions
         let mut actions = WeightedPlayerActions::default();
@@ -99,6 +108,38 @@ impl Entity {
                 }
 
                 return PlayerActionResult::NoEffect;
+            }
+
+            PlayerAction::PickUpEntity(entity_id) => {
+                // Find that item, it must be an `item` (have an item field)
+                let Some(item_entity) = ctx.entities.by_id(entity_id) else {
+                    warn!("Cannot pick up non-existent entity");
+                    return PlayerActionResult::NoEffect;
+                };
+                let Some(item) = &item_entity.attributes.item else {
+                    warn!("Cannot pick up non-item");
+                    return PlayerActionResult::NoEffect;
+                };
+
+                // Do we have room?
+                let avail_space = self.available_inventory_load(ctx.entities);
+                if item.heft > avail_space {
+                    return PlayerActionResult::NoEffect;
+                }
+
+                // Log the pickup action
+                ctx.send_log(GameLog::entity_pair(
+                    self,
+                    item_entity,
+                    GameLogBody::EntityPickUp,
+                ));
+
+                // Add to our inventory
+                // and banish it from the world (so others cant pick it up too etc)
+                self.relations.inventory_mut().insert(entity_id.clone());
+                return PlayerActionResult::SideEffect(PlayerActionSideEffect::BanishOther(
+                    entity_id.clone(),
+                ));
             }
 
             PlayerAction::BumpMotivator(key) => {
@@ -327,34 +368,9 @@ impl Entity {
                 return PlayerActionResult::NoEffect;
             }
 
-            PlayerAction::ConsumeFood {
-                try_dubious,
-                try_morally_wrong,
-            } => {
-                // Is there food at this location?
-                let mut rng = rand::rng();
-                let food_entities = ctx
-                    .entities
-                    .in_hex(self.attributes.hex.unwrap())
-                    .filter(|e| match e.attributes.food {
-                        // Is it food at all?
-                        None => false,
-
-                        // Is it food but dubious?
-                        Some(EntityFood {
-                            poison,
-                            morally_wrong,
-                            ..
-                        }) if poison > 0.0 => {
-                            *try_dubious && (!morally_wrong || *try_morally_wrong)
-                        }
-
-                        // Good food
-                        Some(EntityFood { .. }) => true,
-                    });
-                let Some(food_entity) = food_entities.choose(&mut rng) else {
-                    return PlayerActionResult::NoEffect;
-                };
+            PlayerAction::ConsumeFoodEntity(food_entity_id) => {
+                // Get that entity
+                let food_entity = ctx.entities.by_id(food_entity_id).unwrap();
 
                 // if there is, eat it
                 let food = food_entity.attributes.food.as_ref().unwrap();
@@ -398,8 +414,81 @@ impl Entity {
                 ));
             }
 
+            PlayerAction::RetrieveInventoryFood => {
+                let Some(food_entity) = self
+                    .resolve_inventory(ctx.entities)
+                    .find(|e| e.attributes.food.is_some())
+                else {
+                    return PlayerActionResult::NoEffect;
+                };
+
+                return self.resolve_action(
+                    PlayerAction::RetrieveEntity(food_entity.entity_id.clone()),
+                    ctx,
+                );
+            }
+
+            PlayerAction::RetrieveEntity(entity_id) => {
+                // Remove from inventory ids
+                self.relations.inventory_mut().remove(entity_id);
+
+                // Get the item entity
+                let Some(item_entity) = ctx.entities.by_id(entity_id) else {
+                    warn!("Attempted to retrieve non existent entity from inventory");
+                    return PlayerActionResult::NoEffect;
+                };
+
+                // Log that we got it out
+                ctx.send_log(GameLog::entity_pair(
+                    self,
+                    item_entity,
+                    GameLogBody::EntityRetrieve,
+                ));
+
+                // Unbanish it
+                return PlayerActionResult::SideEffect(PlayerActionSideEffect::UnbanishOther(
+                    item_entity.entity_id.clone(),
+                    self.attributes.hex.unwrap(),
+                ));
+            }
+
+            PlayerAction::ConsumeNearbyFood {
+                try_dubious,
+                try_morally_wrong,
+            } => {
+                // Is there food at this location?
+                let mut rng = rand::rng();
+                let food_entities = ctx
+                    .entities
+                    .in_hex(self.attributes.hex.unwrap())
+                    .filter(|e| match e.attributes.food {
+                        // Is it food at all?
+                        None => false,
+
+                        // Is it food but dubious?
+                        Some(EntityFood {
+                            poison,
+                            morally_wrong,
+                            ..
+                        }) if poison > 0.0 => {
+                            *try_dubious && (!morally_wrong || *try_morally_wrong)
+                        }
+
+                        // Good food
+                        Some(EntityFood { .. }) => true,
+                    });
+                let Some(food_entity) = food_entities.choose(&mut rng) else {
+                    return PlayerActionResult::NoEffect;
+                };
+
+                return self.resolve_action(
+                    PlayerAction::ConsumeFoodEntity(food_entity.entity_id.clone()),
+                    ctx,
+                );
+            }
+
             // NOTE: entity may not exist at this point
-            PlayerAction::Mourn { entity_id } => {
+            PlayerAction::MournEntity { entity_id } => {
                 // Get sad
                 self.attributes.motivators.bump::<Sadness>();
 
@@ -475,7 +564,7 @@ impl Entity {
                 return PlayerActionResult::Ok;
             }
 
-            PlayerAction::Greet { entity_id } => {
+            PlayerAction::GreetEntity { entity_id } => {
                 // let being_entities = ctx
                 //     .entities
                 //     .in_hex(self.attributes.hex.unwrap())
