@@ -90,6 +90,7 @@ impl<T: AsRef<Entity>> AsEntityId for T {
 #[derive(Debug, Clone, Serialize)]
 #[qubit::ts]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[allow(unused)]
 pub enum GameLogBody {
     /// An entity moving from one hex to another
     EntityMovement { by: AxialHexDirection },

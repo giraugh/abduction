@@ -5,7 +5,7 @@ use crate::{
     create_markers,
     entity::{
         brain::{
-            motivator::{self, Hurt},
+            motivator,
             player_action::{PlayerActionResult, PlayerActionSideEffect},
         },
         gen::generate_corpse,

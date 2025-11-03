@@ -79,6 +79,7 @@ pub enum GameEventKind {
     Death { entity_id: EntityId },
 }
 
+#[allow(unused)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GameEventTarget {
     /// A specific entity

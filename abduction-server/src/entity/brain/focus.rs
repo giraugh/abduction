@@ -47,8 +47,8 @@ impl Signal for PlayerFocus {
     ) {
         match self {
             PlayerFocus::Unfocused => {}
-            PlayerFocus::Sleeping { remaining_turns } => {}
-            PlayerFocus::Discussion { with, interest } => {
+            PlayerFocus::Sleeping { .. } => {}
+            PlayerFocus::Discussion { interest, .. } => {
                 let friendliness = ctx.entity.characteristic(Characteristic::Friendliness);
 
                 // For now just chat

@@ -90,7 +90,7 @@ impl MatchManager {
     ///
     /// This should only be done once per match, realistically - so prob do it when
     /// the config is created
-    pub async fn initialise_new_match(&mut self, db: &Db) -> anyhow::Result<()> {
+    pub async fn initialise_new_match(&mut self, _db: &Db) -> anyhow::Result<()> {
         // Now we initialise it...
         info!("Initialising match {}", &self.config.match_id);
 

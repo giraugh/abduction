@@ -1,8 +1,9 @@
 use super::GameEventKind;
 use crate::{
     entity::brain::{
-        characteristic::{Characteristic, CharacteristicStrength},
-        motivator::{MotivatorKey, Sadness},
+        characteristic::Characteristic,
+        focus::PlayerFocus,
+        motivator::MotivatorKey,
         player_action::PlayerAction,
         signal::{Signal, SignalContext, WeightedPlayerActions},
     },
@@ -41,12 +42,20 @@ impl Signal for GameEvent {
 
         // Then handle the specific type
         match &self.kind {
-            GameEventKind::LeaveHex { entity_id } => {
+            GameEventKind::LeaveHex {
+                entity_id: _entity_id,
+            } => {
                 // TODO
             }
             GameEventKind::ArriveInHex { entity_id } => {
                 // Ignore this if its us
                 if *entity_id == ctx.entity.entity_id {
+                    return;
+                }
+
+                // If we are focused on something, we dont notice
+                // (for now)
+                if ctx.focus != PlayerFocus::Unfocused {
                     return;
                 }
 
