@@ -11,8 +11,9 @@ use super::{
 };
 use crate::{
     create_markers,
-    entity::brain::{
-        discussion::DiscussionAction, focus::PlayerFocus, signal::WeightedPlayerActions,
+    entity::{
+        brain::{discussion::DiscussionAction, focus::PlayerFocus, signal::WeightedPlayerActions},
+        world::WeatherKind,
     },
     logs::GameLogBody,
 };
@@ -451,7 +452,6 @@ impl Signal for Tiredness {
                     );
                 }
             }
-            PlayerFocus::Sleeping { .. } => actions.add(10, PlayerAction::Sleep),
             _ => {}
         }
     }
@@ -483,6 +483,18 @@ impl Signal for Saturation {
                         PlayerAction::BumpMotivator(MotivatorKey::Sickness),
                     );
                 }
+
+                // If raining, go seek shelter
+                if self.motivation() > 0.1 && ctx.world_state.weather.is_raining() {
+                    actions.add(
+                        10,
+                        PlayerAction::Sequential(vec![
+                            PlayerAction::TakeShelter,
+                            PlayerAction::SeekShelter,
+                            PlayerAction::Bark(self.motivation(), MotivatorKey::Saturation),
+                        ]),
+                    );
+                }
             }
             _ => {}
         }
@@ -495,16 +507,25 @@ impl Signal for Cold {
             PlayerFocus::Unfocused => {
                 // TODO: more intelligent plans like finding shelter etc
 
+                // If cold, go seek shelter
+                if self.motivation() > 0.4 {
+                    actions.add(
+                        10,
+                        PlayerAction::Sequential(vec![
+                            PlayerAction::TakeShelter,
+                            PlayerAction::SeekShelter,
+                            PlayerAction::Bark(self.motivation(), MotivatorKey::Cold),
+                        ]),
+                    );
+                }
+
                 // The cold just makes you tired for now
                 // and maybe sick?
-                if self.motivation() > 0.5 {
+                if self.motivation() > 0.6 {
                     actions.add(5, PlayerAction::BumpMotivator(MotivatorKey::Tiredness));
                     actions.add(2, PlayerAction::BumpMotivator(MotivatorKey::Sickness));
                     actions.add(2, PlayerAction::BumpMotivator(MotivatorKey::Sadness));
-                    actions.add(
-                        10,
-                        PlayerAction::Bark(self.motivation(), MotivatorKey::Cold),
-                    );
+                    actions.add(8, PlayerAction::Bark(self.motivation(), MotivatorKey::Cold));
                 }
 
                 // and hurt in the absolute worst case

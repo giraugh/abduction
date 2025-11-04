@@ -8,7 +8,7 @@ pub mod signal;
 
 use itertools::Itertools;
 use rand::seq::{IndexedRandom, IteratorRandom};
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::{
     entity::{
@@ -47,6 +47,7 @@ impl Entity {
             entities: ctx.entities,
             entity: self,
             focus: current_focus.clone(),
+            world_state: ctx.world_state,
         };
 
         // Collect signals
@@ -656,6 +657,59 @@ impl Entity {
                         });
                     }
                 }
+            }
+
+            PlayerAction::TakeShelter => {
+                // Is there shelter at my location?
+                let Some(shelter_entity) = ctx
+                    .entities
+                    .in_hex(self.attributes.hex.unwrap())
+                    .find(|e| e.attributes.shelter.is_some())
+                else {
+                    return PlayerActionResult::NoEffect;
+                };
+
+                // Shelter in that thang
+                self.attributes.focus = Some(PlayerFocus::Sheltering {
+                    shelter_entity_id: shelter_entity.entity_id.clone(),
+                });
+
+                // Log it
+                ctx.send_log(GameLog::entity_pair(
+                    self,
+                    shelter_entity,
+                    GameLogBody::EntityTakeShelter,
+                ));
+
+                return PlayerActionResult::Ok;
+            }
+
+            PlayerAction::LeaveShelter => {
+                // Check we are in shelter
+                let Some(PlayerFocus::Sheltering { shelter_entity_id }) =
+                    self.attributes.focus.clone()
+                else {
+                    warn!("Tried to leave shelter but not in shelter");
+                    return PlayerActionResult::NoEffect;
+                };
+
+                // Then leave shelter
+                self.attributes.focus = Some(PlayerFocus::Unfocused);
+
+                // and log that
+                ctx.send_log(GameLog::entity_pair(
+                    self,
+                    &shelter_entity_id,
+                    GameLogBody::EntityLeaveShelter,
+                ));
+
+                return PlayerActionResult::Ok;
+            }
+
+            PlayerAction::SeekShelter => {
+                // TODO: actually implement this
+                warn!("not implemented yet");
+                return PlayerActionResult::NoEffect;
             }
 
             // Moving in a given hex direction

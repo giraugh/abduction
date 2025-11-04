@@ -3,6 +3,7 @@ use rand::distr::{weighted::WeightedIndex, Distribution};
 use crate::entity::{
     brain::{focus::PlayerFocus, player_action::PlayerAction},
     snapshot::EntityView,
+    world::EntityWorld,
     Entity,
 };
 
@@ -18,6 +19,9 @@ pub struct SignalContext<'a> {
 
     /// The current focus of the entity having its signal resolved
     pub focus: PlayerFocus,
+
+    /// The current world state
+    pub world_state: &'a EntityWorld,
 }
 
 /// Something that a player acts on -> can raise weighted actions

@@ -35,10 +35,12 @@
 
 	function entityEmoji(entity: Entity) {
 		if (entity.markers.includes('player')) return '🤷‍♂️';
-		if (entity.attributes.corpse) return '💀';
-		if (entity.attributes.hazard) return '🔥';
-		if (entity.attributes.location) return '📍';
-		if (entity.attributes.food) return '🍽️';
+		if (entity.attributes.corpse !== undefined) return '💀';
+		if (entity.attributes.hazard !== undefined) return '🔥';
+		if (entity.attributes.location !== undefined) return '📍';
+		if (entity.attributes.food !== undefined) return '🍽️';
+		if (entity.attributes.water_source !== undefined) return '🌊';
+		if (entity.attributes.shelter !== undefined) return '🚪';
 
 		return '';
 	}

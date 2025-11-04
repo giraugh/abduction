@@ -51,7 +51,7 @@ pub struct ActionCtx<'a> {
     pub entities: &'a EntityView<'a>,
     pub events: &'a EventsView<'a>,
     pub config: &'a MatchConfig,
-    pub current_world_state: &'a EntityWorld,
+    pub world_state: &'a EntityWorld,
 
     log_tx: &'a Sender<GameLog>,
     events_buffer: &'a mut Vec<GameEvent>,
@@ -125,8 +125,9 @@ impl MatchManager {
             // Generate some amount of props in each hex
             let hex = entity.attributes.hex.as_ref().unwrap();
             let location_kind = entity.attributes.location.as_ref().unwrap().location_kind;
-            let prop_count = rng.random_range(0..5);
             let prop_generators = location_kind.prop_generators();
+            let max_gen = prop_generators.max_count.unwrap_or(5);
+            let prop_count = rng.random_range(0..=max_gen);
 
             // Generate required entities for location type
             for required_generator in &prop_generators.required {

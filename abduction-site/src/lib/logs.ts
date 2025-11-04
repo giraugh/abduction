@@ -164,7 +164,7 @@ export function logMessage(log: GameLog, game: Game) {
 	}
 
 	if (log.kind === 'entity_warm_because_of_time') {
-		return `${primaryName} warms up a bit in the sun`;
+		return `${primaryName} soaks up some rays in the sun`;
 	}
 
 	if (log.kind === 'entity_saturated_because_of_rain') {
@@ -231,5 +231,13 @@ export function logMessage(log: GameLog, game: Game) {
 
 	if (log.kind === 'entity_retrieve') {
 		return `${primaryName} gets out their ${secondaryName}`;
+	}
+
+	if (log.kind === 'entity_take_shelter') {
+		return `${primaryName} enters the shelter of ${secondaryName}`;
+	}
+
+	if (log.kind === 'entity_leave_shelter') {
+		return `${primaryName} exits the shelter of ${secondaryName}`;
 	}
 }

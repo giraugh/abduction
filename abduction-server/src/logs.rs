@@ -193,6 +193,12 @@ pub enum GameLogBody {
     /// The primary entity consumed the secondary entity
     EntityConsume,
 
+    /// The primary entity took shelter in/at the secondary entity
+    EntityTakeShelter,
+
+    /// The primary entity left the shelter of the secondary entity
+    EntityLeaveShelter,
+
     /// Entity A (a hazard) hurts entity B
     HazardHurt,
 }

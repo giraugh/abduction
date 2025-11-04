@@ -7,7 +7,7 @@ use rand::seq::IndexedRandom;
 
 use crate::{
     create_markers,
-    entity::{Entity, EntityAttributes, EntityFood, EntityItem, EntityWaterSource},
+    entity::{Entity, EntityAttributes, EntityFood, EntityItem, EntityShelter, EntityWaterSource},
 };
 
 /// These are different generators that can create types of props
@@ -28,6 +28,9 @@ pub enum PropGenerator {
 
     /// A naturally occuring infinite source of water, potentially causing sickness
     DubiousNaturalWaterSource,
+
+    /// A naturally occuring place to shelter
+    NaturalShelter,
 
     /// Food found in nature that might be poisonous
     PossiblyPoisonousFood,
@@ -89,6 +92,7 @@ impl PropGenerator {
                     choice!(rng, QUALITY_WATER_SOURCE_QUALIFIER, COLOR)
                 )
             }
+            PropGenerator::NaturalShelter => String::from(*choice!(rng, NATURAL_SHELTER)),
         }
     }
 
@@ -147,6 +151,16 @@ impl PropGenerator {
                 name: capitalize(&self.name(rng)),
                 attributes: EntityAttributes {
                     water_source: Some(EntityWaterSource::quality()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+
+            PropGenerator::NaturalShelter => Entity {
+                entity_id: Entity::id(),
+                name: capitalize(&self.name(rng)),
+                attributes: EntityAttributes {
+                    shelter: Some(EntityShelter),
                     ..Default::default()
                 },
                 ..Default::default()

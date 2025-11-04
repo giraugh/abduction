@@ -91,6 +91,15 @@ pub enum PlayerAction {
     /// Drink from a water source at current location
     /// (including water that looks bad?)
     DrinkFromWaterSource { try_dubious: bool },
+
+    /// Enter shelter at current location if possible
+    TakeShelter,
+
+    /// Leave current shelter
+    LeaveShelter,
+
+    /// Find somewhere with shelter
+    SeekShelter,
 }
 
 #[derive(Clone, Debug)]

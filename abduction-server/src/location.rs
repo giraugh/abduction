@@ -21,6 +21,10 @@ pub struct LocPropGenerators {
 
     /// Each entity may be generated 0 or more times
     pub optional: Vec<PropGenerator>,
+
+    /// When set, the maximum number of props for this tile
+    /// (can be used to make a tile much more populated or much less)
+    pub max_count: Option<usize>,
 }
 
 impl LocPropGenerators {
@@ -35,6 +39,11 @@ impl LocPropGenerators {
 
     pub fn with_optional(mut self, generator: PropGenerator) -> Self {
         self.optional.push(generator);
+        self
+    }
+
+    pub fn with_gen_count(mut self, count: usize) -> Self {
+        self.max_count = Some(count);
         self
     }
 
@@ -120,17 +129,21 @@ impl LocationKind {
         use PropGenerator::*;
         match self {
             // Plains are pretty barren
-            LocationKind::Plain => LocPropGenerators::none(),
+            LocationKind::Plain => LocPropGenerators::default(),
 
             // Hills have food but not water
-            LocationKind::Hill => LocPropGenerators::default().with_optional(NaturalFood),
+            LocationKind::Hill => LocPropGenerators::default()
+                .with_optional(NaturalFood)
+                .with_optional(NaturalShelter)
+                .with_gen_count(2),
 
             // Forests are lush with lots of food and water
             LocationKind::Forest => LocPropGenerators::default()
                 .with_optional(PossiblyPoisonousFood)
                 .with_optional(NaturalFood)
                 .with_optional(QualityNaturalWaterSource)
-                .with_optional(DubiousNaturalWaterSource),
+                .with_optional(DubiousNaturalWaterSource)
+                .with_gen_count(8),
 
             // Lakes always generate a lake water source and also food in the form of fish
             LocationKind::Lake => LocPropGenerators::default()
@@ -138,9 +151,9 @@ impl LocationKind {
                 .with_optional(Fish),
 
             // Mountiains are pretty barren but can have a mountain lake
-            LocationKind::Mountain => {
-                LocPropGenerators::default().with_optional(QualityNaturalWaterSource)
-            }
+            LocationKind::Mountain => LocPropGenerators::default()
+                .with_optional(QualityNaturalWaterSource)
+                .with_optional(NaturalShelter),
 
             // Small Hut is a WIP
             LocationKind::SmallHut => LocPropGenerators::none(),

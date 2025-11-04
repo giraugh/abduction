@@ -5,6 +5,7 @@ use crate::{
     create_markers,
     entity::{
         brain::{
+            focus::PlayerFocus,
             motivator,
             player_action::{PlayerActionResult, PlayerActionSideEffect},
         },
@@ -52,7 +53,7 @@ impl MatchManager {
             events: &events,
             log_tx: &ctx.log_tx,
             config: &self.config,
-            current_world_state: &current_world_state,
+            world_state: &current_world_state,
             events_buffer: &mut events_buffer,
         };
 
@@ -186,7 +187,7 @@ impl MatchManager {
         // TODO
 
         // Rain putting out fires
-        if current_world_state.weather.rain_proc_chance_scale() > 0.0 {
+        if current_world_state.weather.is_raining() {
             for entity in entities_view.all() {
                 if has_markers!(entity, Fire) && rng.random_bool(0.05) {
                     self.entities.remove_entity(&entity.entity_id).unwrap();
@@ -200,8 +201,16 @@ impl MatchManager {
     fn resolve_world_effect_on_player(&self, player: &mut Entity, ctx: &mut ActionCtx) {
         let mut rng = rand::rng();
 
+        // Are they sheltering?
+        // if so, some of the world stops acting on them
+        let unfocused = matches!(player.attributes.focus, None | Some(PlayerFocus::Unfocused));
+        let sheltering = matches!(
+            player.attributes.focus,
+            Some(PlayerFocus::Sheltering { .. })
+        );
+
         // Is there a `hazard` entity at their hex?
-        if player.attributes.hex.is_some() && rng.random_bool(0.7) {
+        if player.attributes.hex.is_some() && rng.random_bool(0.7) && unfocused {
             for entity in self
                 .entities
                 .get_all_entities()
@@ -226,7 +235,7 @@ impl MatchManager {
 
         // Is there a water source at their location? They can fall in and get wet
         // TODO: maybe this is based on some kind of clumsiness stat?
-        if rng.random_bool(0.01) {
+        if rng.random_bool(0.01) && unfocused {
             if let Some(water_source_entity) = self.entities.get_all_entities().find(|e| {
                 e.attributes.water_source.is_some() && e.attributes.hex == player.attributes.hex
             }) {
@@ -257,12 +266,12 @@ impl MatchManager {
 
         // Is it cold?
         let cold_chance_scale_from_time = ctx
-            .current_world_state
+            .world_state
             .time_of_day
             .current_temp_as_cold_proc_chance_scale();
-        let cold_chance_scale_from_wind = ctx.current_world_state.weather.wind_proc_chance_scale();
+        let cold_chance_scale_from_wind = ctx.world_state.weather.wind_proc_chance_scale();
         let cold_chance = cold_chance_scale_from_time * cold_chance_scale_from_wind * 0.2;
-        if rng.random_bool(cold_chance as f64) {
+        if !sheltering && rng.random_bool(cold_chance as f64) {
             // TODO: prob need a way to find shelter or warm up huh
             player.attributes.motivators.bump::<motivator::Cold>();
 
@@ -274,7 +283,7 @@ impl MatchManager {
         }
 
         // Warm up in the sun?
-        if cold_chance_scale_from_time == 0.0 && rng.random_bool(0.05) {
+        if !sheltering && cold_chance_scale_from_time == 0.0 && rng.random_bool(0.05) {
             // Check we need to warm up
             if player
                 .attributes
@@ -296,8 +305,8 @@ impl MatchManager {
         }
 
         // Is it raining?
-        let rain_chance_scale = ctx.current_world_state.weather.rain_proc_chance_scale();
-        if rng.random_bool((rain_chance_scale as f64) * 0.1) {
+        let rain_chance_scale = ctx.world_state.weather.rain_proc_chance_scale();
+        if !sheltering && rng.random_bool((rain_chance_scale as f64) * 0.1) {
             // TODO: prob need a way to find shelter or warm up huh
             player.attributes.motivators.bump::<motivator::Saturation>();
 
@@ -309,7 +318,7 @@ impl MatchManager {
         }
 
         // Lightning strike?
-        if matches!(ctx.current_world_state.weather, WeatherKind::LightningStorm) {
+        if !sheltering && matches!(ctx.world_state.weather, WeatherKind::LightningStorm) {
             // Quite rare to be direct hit
             if rng.random_bool(0.0005) {
                 // Very damaging
@@ -326,7 +335,7 @@ impl MatchManager {
         // Or tired?
         // (more at night)
         if rng.random_bool(0.005)
-            || (ctx.current_world_state.time_of_day == TimeOfDay::Night && rng.random_bool(0.01))
+            || (ctx.world_state.time_of_day == TimeOfDay::Night && rng.random_bool(0.01))
         {
             player.attributes.motivators.bump::<motivator::Tiredness>();
         }

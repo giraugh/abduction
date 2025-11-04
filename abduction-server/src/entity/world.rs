@@ -121,6 +121,10 @@ pub enum WeatherKind {
 }
 
 impl WeatherKind {
+    pub fn is_raining(&self) -> bool {
+        self.rain_proc_chance_scale() > 0.0
+    }
+
     pub fn rain_proc_chance_scale(&self) -> f32 {
         match self {
             WeatherKind::Lovely => 0.0,
@@ -150,7 +154,7 @@ impl WeatherKind {
     pub fn transitions(&self) -> Vec<(Self, usize)> {
         use WeatherKind::*;
         match self {
-            Lovely => vec![(Lovely, 5), (Overcast, 5), (LightWind, 2), (LightRain, 2)],
+            Lovely => vec![(Lovely, 5), (Overcast, 5), (LightWind, 2), (LightRain, 1)],
             Sunny => vec![(Sunny, 5), (Lovely, 5), (Overcast, 2)],
             Overcast => vec![(Overcast, 5), (Lovely, 5), (LightWind, 5), (LightRain, 5)],
             LightWind => vec![
@@ -158,11 +162,11 @@ impl WeatherKind {
                 (Overcast, 5),
                 (Hurricane, 1),
                 // (LightningStorm, 1),
-                (LightRain, 2),
+                (LightRain, 1),
             ],
             Hurricane => vec![(Hurricane, 5), (LightWind, 5), (LightningStorm, 2)],
-            LightRain => vec![(LightRain, 5), (HeavyRain, 4)],
-            HeavyRain => vec![(HeavyRain, 5), (LightRain, 5), (LightningStorm, 2)],
+            LightRain => vec![(LightRain, 5), (HeavyRain, 2)],
+            HeavyRain => vec![(HeavyRain, 3), (LightRain, 5), (LightningStorm, 2)],
             LightningStorm => vec![(LightningStorm, 5), (HeavyRain, 5)],
         }
     }

@@ -109,6 +109,9 @@ pub struct EntityAttributes {
     /// If set, this entity is an infinite water source
     pub water_source: Option<EntityWaterSource>,
 
+    /// If set, this entity is somewhere you can shelter
+    pub shelter: Option<EntityShelter>,
+
     /// The current details of the world
     pub world: Option<EntityWorld>,
 
@@ -279,6 +282,11 @@ impl EntityFood {
         }
     }
 }
+
+/// WIP but this signals somewhere a player can shelter
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[qubit::ts]
+pub struct EntityShelter;
 
 /// An infinite water source
 /// All water is just as good at quenching thirst and all water sources are infinite

@@ -158,3 +158,17 @@ pub const FISH: &[&str] = &[
     "merlin",
     "pufferfish",
 ];
+
+pub const NATURAL_SHELTER: &[&str] = &[
+    "cave",
+    "cavern",
+    "grotto",
+    "rocky overhang",
+    "rocky alcove",
+    "hollow tree",
+    "hollow trunk",
+    "large boulder",
+    "dense thicket",
+    "large tree",
+    "dirt embankment",
+];

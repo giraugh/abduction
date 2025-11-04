@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::entity::{
     brain::{
-        characteristic::Characteristic, discussion::DiscussionAction, player_action::PlayerAction,
+        characteristic::Characteristic,
+        discussion::DiscussionAction,
+        motivator::{self, Motivator, MotivatorKey},
+        player_action::PlayerAction,
         signal::Signal,
     },
     EntityId,
@@ -37,6 +40,12 @@ pub enum PlayerFocus {
         /// at 0, we stop the conversation (not rude per se)
         interest: usize,
     },
+
+    /// Taking shelter in some shelter
+    /// - helps reduce cold/wind and reduces their impact
+    /// - increases boredom
+    /// - blocks certain other actions
+    Sheltering { shelter_entity_id: EntityId },
 }
 
 impl Signal for PlayerFocus {
@@ -47,7 +56,32 @@ impl Signal for PlayerFocus {
     ) {
         match self {
             PlayerFocus::Unfocused => {}
-            PlayerFocus::Sleeping { .. } => {}
+            PlayerFocus::Sleeping { .. } => {
+                actions.add(10, PlayerAction::Sleep);
+            }
+            PlayerFocus::Sheltering { .. } => {
+                // Get less cold and wet
+                actions.add(5, PlayerAction::ReduceMotivator(MotivatorKey::Cold));
+                actions.add(5, PlayerAction::ReduceMotivator(MotivatorKey::Saturation));
+
+                // When to leave?
+                // If we ever zero out both motivators, we always leave
+                let cold = ctx
+                    .entity
+                    .attributes
+                    .motivators
+                    .get_motivation::<motivator::Cold>()
+                    .unwrap_or_default();
+                let saturation = ctx
+                    .entity
+                    .attributes
+                    .motivators
+                    .get_motivation::<motivator::Saturation>()
+                    .unwrap_or_default();
+                if cold == saturation && cold == 0.0 {
+                    actions.add(10, PlayerAction::LeaveShelter);
+                }
+            }
             PlayerFocus::Discussion { interest, .. } => {
                 let friendliness = ctx.entity.characteristic(Characteristic::Friendliness);
 
