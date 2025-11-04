@@ -1,10 +1,8 @@
 #![allow(clippy::single_match)]
 
-use anyhow::anyhow;
 use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
-use std::{collections::HashMap, fmt, str::FromStr};
+use std::collections::HashMap;
 use tracing::warn;
 
 use super::{
@@ -43,6 +41,7 @@ macro_rules! seq {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(from = "MotivatorDataTuple", into = "MotivatorDataTuple")]
 #[qubit::ts]
+#[ts(as = "MotivatorDataTuple")]
 pub struct MotivatorData {
     /// 0-1 motivation
     motivation: f32,

@@ -304,7 +304,7 @@
 				<h3>Motivators</h3>
 				<table class="attribute-table">
 					<tbody>
-						{#each Object.entries(motivators).toSorted((a, b) => b[1].motivation - a[1].motivation) as [motivatorKey] (motivatorKey)}
+						{#each Object.entries(motivators).toSorted((a, b) => b[1][0] - a[1][0]) as [motivatorKey] (motivatorKey)}
 							{@const key = motivatorKey as MotivatorKey}
 							{@const motivator = motivators[key]!}
 							{@const motivation = Math.floor(100 * Number(motivator[0]))}
