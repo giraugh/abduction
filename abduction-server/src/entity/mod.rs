@@ -153,12 +153,6 @@ impl EntityRelations {
         self.inventory.iter().flat_map(|i| i.iter())
     }
 
-    pub fn get_associate(&mut self, entity_id: &EntityId) -> Option<&mut EntityAssociate> {
-        self.associates
-            .as_mut()
-            .and_then(|associates| associates.get_mut(entity_id))
-    }
-
     /// Whether we actively like a given entity
     /// (i.e have a positive non-zero bond)
     pub fn bond(&self, entity_id: &EntityId) -> f32 {

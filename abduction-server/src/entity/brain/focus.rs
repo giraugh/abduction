@@ -4,7 +4,7 @@ use crate::entity::{
     brain::{
         characteristic::Characteristic,
         discussion::DiscussionAction,
-        motivator::{self, Motivator, MotivatorKey},
+        motivator::{self, MotivatorKey},
         player_action::PlayerAction,
         signal::Signal,
     },

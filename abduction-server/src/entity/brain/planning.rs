@@ -14,14 +14,13 @@ use crate::entity::{
 pub enum PlanningSignal {
     /// Do we have access to food in inventory?
     FoodAccess,
+    // Do we have access to water in inventory?
+    // (NOT REALLY A THING YET)
+    // WaterAccess,
 
-    /// Do we have access to water in inventory?
-    /// (NOT REALLY A THING YET)
-    WaterAccess,
-
-    /// Do we have shelter available to us?
-    /// (NOT REALLY A THING YET)
-    Shelter,
+    // Do we have shelter available to us?
+    // (NOT REALLY A THING YET)
+    // Shelter,
 }
 
 impl Signal for PlanningSignal {
@@ -33,9 +32,8 @@ impl Signal for PlanningSignal {
         };
 
         match self {
-            PlanningSignal::WaterAccess => todo!(),
-            PlanningSignal::Shelter => todo!(),
-
+            // PlanningSignal::WaterAccess => todo!(),
+            // PlanningSignal::Shelter => todo!(),
             PlanningSignal::FoodAccess => {
                 // Attempt to pick up food at our location
                 // Is there food we could pick up?

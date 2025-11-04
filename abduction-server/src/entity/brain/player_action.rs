@@ -7,6 +7,7 @@ use super::discussion::DiscussionAction;
 use super::motivator::MotivatorKey;
 
 #[derive(Clone, Debug)]
+#[allow(unused)]
 pub enum PlayerAction {
     /// No-op
     /// "<player> twiddles their thumbs" etc
