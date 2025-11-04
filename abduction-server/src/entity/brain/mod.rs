@@ -1,6 +1,7 @@
 pub mod characteristic;
 pub mod discussion;
 pub mod focus;
+pub mod meme;
 pub mod motivator;
 pub mod planning;
 pub mod player_action;
@@ -8,7 +9,7 @@ pub mod signal;
 
 use itertools::Itertools;
 use rand::seq::{IndexedRandom, IteratorRandom};
-use tracing::{info, warn};
+use tracing::warn;
 
 use crate::{
     entity::{
@@ -560,6 +561,18 @@ impl Entity {
                         water_source_entity,
                         GameLogBody::EntityComplainAboutTaste,
                     ));
+
+                    // Remember it's dangerous
+                    self.memes_mut()
+                        .remember_is_dangerous(water_source_entity.id());
+                }
+
+                // If the water source was safe, remember it
+                if water_source.poison == 0.0 {
+                    self.memes_mut().remember_is_safe(water_source_entity.id());
+                    self.memes_mut().insert(meme::Meme::WaterSourceAt(
+                        water_source_entity.attributes.hex.unwrap(),
+                    ));
                 }
 
                 return PlayerActionResult::Ok;
@@ -679,6 +692,11 @@ impl Entity {
                     self,
                     shelter_entity,
                     GameLogBody::EntityTakeShelter,
+                ));
+
+                // and remember it
+                self.memes_mut().insert(meme::Meme::ShelterAt(
+                    shelter_entity.attributes.hex.unwrap(),
                 ));
 
                 return PlayerActionResult::Ok;

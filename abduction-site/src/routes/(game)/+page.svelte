@@ -279,18 +279,18 @@
 				<table class="attribute-table">
 					<tbody>
 						{#each Object.entries(characteristics)
-							.toSorted((a, b) => b[1].charCodeAt() - a[1].charCodeAt())
+							.toSorted((a, b) => a[1] - b[1])
 							.toReversed() as [characteristic, strength] (characteristic)}
 							<tr>
 								<td>{capitalize(characteristic)}</td>
 								<td
 									class="characteristic-strength"
-									class:high={strength === 'high'}
-									class:low={strength === 'low'}
+									class:high={strength === 2}
+									class:low={strength === 0}
 								>
-									{#if strength === 'high'}
+									{#if strength === 2}
 										⬆
-									{:else if strength === 'low'}
+									{:else if strength === 0}
 										⬇
 									{:else}
 										➡️
@@ -307,7 +307,7 @@
 						{#each Object.entries(motivators).toSorted((a, b) => b[1].motivation - a[1].motivation) as [motivatorKey] (motivatorKey)}
 							{@const key = motivatorKey as MotivatorKey}
 							{@const motivator = motivators[key]!}
-							{@const motivation = Math.floor(motivator.motivation * 100)}
+							{@const motivation = Math.floor(100 * Number(motivator[0]))}
 							{#if !STATISTIC_LIKE_MOTIVATORS.includes(key)}
 								<tr><td>{capitalize(motivatorKey)}</td><td>{motivation}%</td></tr>
 							{/if}

@@ -1,13 +1,17 @@
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Serialize_repr, Deserialize_repr,
+)]
 #[qubit::ts]
+#[ts(as = "usize")]
+#[repr(usize)]
 pub enum CharacteristicStrength {
-    Low,
+    Low = 0,
     #[default]
-    Average,
-    High,
+    Average = 1,
+    High = 2,
 }
 
 impl CharacteristicStrength {

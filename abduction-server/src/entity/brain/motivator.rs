@@ -1,8 +1,10 @@
 #![allow(clippy::single_match)]
 
+use anyhow::anyhow;
 use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use serde_with::{serde_as, DisplayFromStr};
+use std::{collections::HashMap, fmt, str::FromStr};
 use tracing::warn;
 
 use super::{
@@ -11,9 +13,8 @@ use super::{
 };
 use crate::{
     create_markers,
-    entity::{
-        brain::{discussion::DiscussionAction, focus::PlayerFocus, signal::WeightedPlayerActions},
-        world::WeatherKind,
+    entity::brain::{
+        discussion::DiscussionAction, focus::PlayerFocus, signal::WeightedPlayerActions,
     },
     logs::GameLogBody,
 };
@@ -40,12 +41,32 @@ macro_rules! seq {
 ///
 /// e.g if sensitivity is 0 for hunger -> that entity does not need to eat
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(from = "MotivatorDataTuple", into = "MotivatorDataTuple")]
 #[qubit::ts]
 pub struct MotivatorData {
     /// 0-1 motivation
     motivation: f32,
     /// 0-1 sensitivity
     sensitivity: f32,
+}
+
+#[derive(Serialize, Deserialize)]
+#[qubit::ts]
+struct MotivatorDataTuple(f32, f32);
+
+impl From<MotivatorData> for MotivatorDataTuple {
+    fn from(value: MotivatorData) -> Self {
+        Self(value.motivation, value.sensitivity)
+    }
+}
+
+impl From<MotivatorDataTuple> for MotivatorData {
+    fn from(value: MotivatorDataTuple) -> Self {
+        Self {
+            motivation: value.0,
+            sensitivity: value.1,
+        }
+    }
 }
 
 /// How to initialise a motivator?

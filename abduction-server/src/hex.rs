@@ -1,3 +1,6 @@
+use std::{fmt, str::FromStr};
+
+use anyhow::anyhow;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -22,6 +25,23 @@ use serde::{Deserialize, Serialize};
 )]
 #[qubit::ts]
 pub struct AxialHex(isize, isize);
+
+impl fmt::Display for AxialHex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{},{}", self.0, self.1)
+    }
+}
+
+impl FromStr for AxialHex {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (x, y) = s
+            .split_once(",")
+            .ok_or(anyhow!("No comma delimeter in hex"))?;
+        Ok(Self(x.parse()?, y.parse()?))
+    }
+}
 
 impl AxialHex {
     pub const ZERO: AxialHex = AxialHex(0, 0);

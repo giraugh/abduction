@@ -18,6 +18,7 @@ use crate::{
         brain::{
             characteristic::{Characteristic, CharacteristicStrength},
             focus::PlayerFocus,
+            meme::MemeTable,
             motivator::MotivatorTable,
         },
         snapshot::EntityView,
@@ -125,6 +126,10 @@ pub struct EntityAttributes {
     /// The value is a % out of 100 for use in HSL
     /// (e.g for player dots)
     pub display_color_hue: Option<f32>,
+
+    /// Optionally, a table of memes (like memetic sharable memories / knowledge)
+    #[serde(flatten)]
+    pub memes: Option<MemeTable>,
 }
 
 #[skip_serializing_none]
@@ -350,6 +355,11 @@ pub struct EntityPayload {
 impl Entity {
     pub fn id() -> EntityId {
         Uuid::now_v7().hyphenated().to_string()
+    }
+
+    /// Get (or insert if not present) a mut reference to this entities meme table
+    pub fn memes_mut(&mut self) -> &mut MemeTable {
+        self.attributes.memes.get_or_insert_default()
     }
 
     pub fn characteristic(&self, characteristic: Characteristic) -> CharacteristicStrength {
