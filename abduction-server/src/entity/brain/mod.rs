@@ -75,6 +75,11 @@ impl Entity {
         action: PlayerAction,
         ctx: &mut ActionCtx,
     ) -> PlayerActionResult {
+        // Must have a hex to take actions
+        let Some(my_hex) = self.attributes.hex else {
+            return PlayerActionResult::NoEffect;
+        };
+
         match &action {
             PlayerAction::Nothing => {
                 return PlayerActionResult::NoEffect;
@@ -237,7 +242,7 @@ impl Entity {
                 // Get entities at my location with that marker
                 let avoid_entities = ctx
                     .entities
-                    .in_hex(self.attributes.hex.expect("Expected hex"))
+                    .in_hex(my_hex)
                     .filter(|e| e.entity_id != self.entity_id)
                     .filter(|e| markers.iter().any(|m| e.markers.contains(m)))
                     .collect_vec();
@@ -260,12 +265,6 @@ impl Entity {
 
             PlayerAction::GoToAdjacent(log_body, markers) => {
                 let mut rng = rand::rng();
-
-                // Do we have a valid hex?
-                let Some(my_hex) = self.attributes.hex else {
-                    warn!("Attempted to search for adjacent entities but player has no hex");
-                    return PlayerActionResult::NoEffect;
-                };
 
                 // Is the current hex such a hex?
                 let current_hex_valid = ctx
@@ -305,12 +304,6 @@ impl Entity {
             // This is a little tricky lets be honest
             // I think I would just do easiest possible approach and move to the neighbour hex which reduces the distance the most
             PlayerAction::GoTowards(log_body, markers) => {
-                // Do we have a valid hex?
-                let Some(my_hex) = self.attributes.hex else {
-                    warn!("Attempted to search for adjacent entities but player has no hex");
-                    return PlayerActionResult::NoEffect;
-                };
-
                 // Is the current hex such a hex?
                 let current_hex_valid = ctx
                     .entities
@@ -333,6 +326,9 @@ impl Entity {
                     return PlayerActionResult::NoEffect;
                 }
 
+                // Emit log
+                ctx.send_log(GameLog::entity(self, log_body.clone()));
+
                 // Now sort the target entities by distance
                 let target_entity = target_entities
                     .iter()
@@ -340,16 +336,22 @@ impl Entity {
                     .unwrap();
                 let target_hex = target_entity.attributes.hex.unwrap();
 
-                // Next, find our adjacent hex which is closest to the target hex
+                return self.resolve_action(PlayerAction::GoTowardsHex(target_hex), ctx);
+            }
+
+            PlayerAction::GoTowardsHex(target_hex) => {
+                // Already there?
+                if *target_hex == my_hex {
+                    return PlayerActionResult::NoEffect;
+                }
+
+                // Find our adjacent hex which is closest to the target hex
                 let adjacent_hex = my_hex
                     .neighbours()
                     .into_iter()
                     .filter(|h| h.within_bounds(ctx.config.world_radius as isize))
-                    .min_by_key(|h| h.dist_to(target_hex))
+                    .min_by_key(|h| h.dist_to(*target_hex))
                     .unwrap();
-
-                // Emit log
-                ctx.send_log(GameLog::entity(self, log_body.clone()));
 
                 // And travel towards that
                 let direction = AxialHexDirection::direction_to(my_hex, adjacent_hex).unwrap();
@@ -450,7 +452,7 @@ impl Entity {
                 // Unbanish it
                 return PlayerActionResult::SideEffect(PlayerActionSideEffect::UnbanishOther(
                     item_entity.entity_id.clone(),
-                    self.attributes.hex.unwrap(),
+                    my_hex,
                 ));
             }
 
@@ -460,25 +462,25 @@ impl Entity {
             } => {
                 // Is there food at this location?
                 let mut rng = rand::rng();
-                let food_entities = ctx
-                    .entities
-                    .in_hex(self.attributes.hex.unwrap())
-                    .filter(|e| match e.attributes.food {
-                        // Is it food at all?
-                        None => false,
+                let food_entities =
+                    ctx.entities
+                        .in_hex(my_hex)
+                        .filter(|e| match e.attributes.food {
+                            // Is it food at all?
+                            None => false,
 
-                        // Is it food but dubious?
-                        Some(EntityFood {
-                            poison,
-                            morally_wrong,
-                            ..
-                        }) if poison > 0.0 => {
-                            *try_dubious && (!morally_wrong || *try_morally_wrong)
-                        }
+                            // Is it food but dubious?
+                            Some(EntityFood {
+                                poison,
+                                morally_wrong,
+                                ..
+                            }) if poison > 0.0 => {
+                                *try_dubious && (!morally_wrong || *try_morally_wrong)
+                            }
 
-                        // Good food
-                        Some(EntityFood { .. }) => true,
-                    });
+                            // Good food
+                            Some(EntityFood { .. }) => true,
+                        });
                 let Some(food_entity) = food_entities.choose(&mut rng) else {
                     return PlayerActionResult::NoEffect;
                 };
@@ -517,7 +519,8 @@ impl Entity {
                 let mut rng = rand::rng();
                 let water_source_entities = ctx
                     .entities
-                    .in_hex(self.attributes.hex.unwrap())
+                    .in_hex(my_hex)
+                    .filter(|e| self.memes_mut().assumably_safe(&e.entity_id))
                     .filter(|e| match e.attributes.water_source {
                         // its dubious, are we okay with that?
                         Some(EntityWaterSource { poison }) if poison > 0.0 => *try_dubious,
@@ -579,29 +582,6 @@ impl Entity {
             }
 
             PlayerAction::GreetEntity { entity_id } => {
-                // let being_entities = ctx
-                //     .entities
-                //     .in_hex(self.attributes.hex.unwrap())
-                //     .filter(|e| e.entity_id != self.entity_id)
-                //     .filter(
-                //         |e| match (has_markers!(e, CanTalk), has_markers!(e, Being)) {
-                //             // If its a human, always yes
-                //             (true, _) => true,
-
-                //             // Otherwise, if we are okay w/ non responders then yes
-                //             (_, true) => *try_cannot_respond,
-
-                //             // Otherwise don't talk with it
-                //             _ => false,
-                //         },
-                //     );
-
-                // // If no applicable being, there's no effect
-                // let mut rng = rand::rng();
-                // let Some(being_entity) = being_entities.choose(&mut rng) else {
-                //     return PlayerActionResult::NoEffect;
-                // };
-
                 let entity = ctx.entities.by_id(entity_id).unwrap();
 
                 // Is there an established association relation?
@@ -676,7 +656,7 @@ impl Entity {
                 // Is there shelter at my location?
                 let Some(shelter_entity) = ctx
                     .entities
-                    .in_hex(self.attributes.hex.unwrap())
+                    .in_hex(my_hex)
                     .find(|e| e.attributes.shelter.is_some())
                 else {
                     return PlayerActionResult::NoEffect;
@@ -724,10 +704,34 @@ impl Entity {
                 return PlayerActionResult::Ok;
             }
 
-            PlayerAction::SeekShelter => {
-                // TODO: actually implement this
-                warn!("not implemented yet");
-                return PlayerActionResult::NoEffect;
+            PlayerAction::SeekKnownWaterSource => {
+                // The only way we have to do this is to use shelter memes
+                let Some(water_source_loc) = self
+                    .memes_mut()
+                    .water_source_locations()
+                    .min_by_key(|l| l.dist_to(my_hex))
+                else {
+                    // we dont know of any
+                    return PlayerActionResult::NoEffect;
+                };
+
+                // Go towards that
+                return self.resolve_action(PlayerAction::GoTowardsHex(water_source_loc), ctx);
+            }
+
+            PlayerAction::SeekKnownShelter => {
+                // The only way we have to do this is to use shelter memes
+                let Some(shelter_loc) = self
+                    .memes_mut()
+                    .shelter_locations()
+                    .min_by_key(|l| l.dist_to(my_hex))
+                else {
+                    // we dont know of any
+                    return PlayerActionResult::NoEffect;
+                };
+
+                // Go towards that
+                return self.resolve_action(PlayerAction::GoTowardsHex(shelter_loc), ctx);
             }
 
             // Moving in a given hex direction

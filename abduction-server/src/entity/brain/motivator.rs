@@ -318,6 +318,7 @@ impl Signal for Thirst {
             PlayerFocus::Unfocused => {
                 // The generic plan for finding water
                 let seek_water_plan: &[PlayerAction] = &[
+                    PlayerAction::SeekKnownWaterSource,
                     PlayerAction::GoToAdjacent(
                         GameLogBody::EntityGoToAdjacentLush,
                         create_markers!(LushLocation),
@@ -510,7 +511,7 @@ impl Signal for Saturation {
                         10,
                         PlayerAction::Sequential(vec![
                             PlayerAction::TakeShelter,
-                            PlayerAction::SeekShelter,
+                            PlayerAction::SeekKnownShelter,
                             PlayerAction::Bark(self.motivation(), MotivatorKey::Saturation),
                         ]),
                     );
@@ -533,7 +534,7 @@ impl Signal for Cold {
                         10,
                         PlayerAction::Sequential(vec![
                             PlayerAction::TakeShelter,
-                            PlayerAction::SeekShelter,
+                            PlayerAction::SeekKnownShelter,
                             PlayerAction::Bark(self.motivation(), MotivatorKey::Cold),
                         ]),
                     );

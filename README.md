@@ -32,25 +32,18 @@ Narrative Framing
  - Introduction by a host
  - Slowly spawn in each player along with a narrative announcement
 
+Water Storage
+ - Could potentially have a "bottle" item
+ - Can fill it with water if held
+  - Has two uses of water
+
 New Motivators Ideas
  - **Disease**
   - Slowly converts into sickness
   - Can spread to others
-
-Agent Mechanics
- - Ability to hold items 
-   - When you pick one up, remove it from the world
- - Goals
-   - Long term strategy that provides an ongoing signal for "what to do when nothing else to do"
-   - i.e low weight actions always present, represent projects etc
- - Memories
-   - Type of relation that assigns tags to another entity
-   - Can be shared w/ other entities
-   - Used as references when resolving other actions
-   - May not be true i.e can be a rumour
-   - e.g
-     - Good water source location
-     - Person who has infectious disease
+ - **Loneliness**
+  - Never see other people, then this happens
+  - Causes talking to non-people
 
 Agent Persistence
  - Want a way for the same "players" to appear in multiple games

@@ -46,6 +46,10 @@ pub enum PlayerAction {
     /// When in a discussion focus, do related actions
     Discussion(DiscussionAction),
 
+    /// Travel towards a given hex
+    /// NOTE: if already at the location, this will do nothing (and cause NoEffect)
+    GoTowardsHex(AxialHex),
+
     /// Travel towards (the nearest?) hex which has an entity with any of the given markers
     /// NOTE: if already at such a location, this will do nothing (and cause NoEffect)
     /// NOTE: requires a log that will be emited interstitially if a suitable hex can be found
@@ -98,8 +102,11 @@ pub enum PlayerAction {
     /// Leave current shelter
     LeaveShelter,
 
-    /// Find somewhere with shelter
-    SeekShelter,
+    /// Head towards shelter if we know where some is
+    SeekKnownShelter,
+
+    /// Head towards water if we know where some is
+    SeekKnownWaterSource,
 }
 
 #[derive(Clone, Debug)]

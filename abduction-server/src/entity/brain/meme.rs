@@ -116,6 +116,12 @@ impl MemeTable {
         }
     }
 
+    /// Do we *not* have explicit evidence that this is dangerous?
+    /// (i.e it may be dangerous but we dont know)
+    pub fn assumably_safe(&self, entity_id: &EntityId) -> bool {
+        self.check_danger(entity_id) != Some(Danger::Dangerous)
+    }
+
     pub fn shelter_locations(&self) -> impl Iterator<Item = AxialHex> + use<'_> {
         self.memes.iter().filter_map(|meme| match meme {
             Meme::ShelterAt(hex) => Some(*hex),
