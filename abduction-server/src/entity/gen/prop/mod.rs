@@ -7,7 +7,7 @@ use rand::seq::IndexedRandom;
 
 use crate::{
     create_markers,
-    entity::{Entity, EntityAttributes, EntityFood, EntityItem, EntityShelter, EntityWaterSource},
+    entity::{Entity, EntityAttributes, EntityFood, EntityItem, EntityWaterSource},
 };
 
 /// These are different generators that can create types of props
@@ -159,8 +159,8 @@ impl PropGenerator {
             PropGenerator::NaturalShelter => Entity {
                 entity_id: Entity::id(),
                 name: capitalize(&self.name(rng)),
+                markers: create_markers!(Shelter),
                 attributes: EntityAttributes {
-                    shelter: Some(EntityShelter),
                     ..Default::default()
                 },
                 ..Default::default()

@@ -11,6 +11,56 @@ use crate::{
     mtch::ActionCtx,
 };
 
+/*
+== Some quick ideation ==
+
+John waves at Smith
+Smith waves back
+John beckons smith over
+John and smith sit down to chat                                        -> Turn order kind of thing
+John asks Smith what they think about the weather                      -> AskOpinion<>
+Smith answers <thoughtfully> that they like it                         -> random variants
+Smith asks John if they've seen any good sources of fresh water        -> Inquire about missing memes
+John's stomach rumbles
+John gets distracted for a second
+Smith frowns in frustration and attempts to get johns attention back   -> Smith's patience characteristic is low
+Smith asks John what they think of <Ella>
+John responds that he is fond of them                                  -> Increases opinion of someone else, scaled by opinion of interlocutor
+John stands up and says farewell to Smith
+Smith farewells John
+
+==
+
+John waves at Smith
+Smith waves back
+John beckons smith over
+John and smith sit down to chat
+John asks Smith a deeply personal question about <their mother>        -> Low social awareness?
+Smith is taken aback and refuses to answer                             -> Bond is too low
+With a frown, Smith stands up and farewells John
+John does not answer
+
+==
+
+John waves at Smith
+Smith does not wave back
+Smith winds up a punch, aiming at John
+
+==
+
+Things to talk about
+ - ask opinion
+   - weather
+   - another player
+ - ask for info
+   - sources of water
+   - sources of shelter
+ - ask personal question
+   - about a parent / sibiling
+   - about their fears
+   - about their hopes
+*/
+
 /// Actions relevant only during the "Discussion" focus
 ///
 /// All discussion actions reduce interest

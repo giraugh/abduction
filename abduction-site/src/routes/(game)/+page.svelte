@@ -37,7 +37,7 @@
 		if (entity.attributes.location !== undefined) return '📍';
 		if (entity.attributes.food !== undefined) return '🍽️';
 		if (entity.attributes.water_source !== undefined) return '🌊';
-		if (entity.attributes.shelter !== undefined) return '🚪';
+		if (entity.markers.includes('shelter')) return '🚪';
 
 		return '';
 	}

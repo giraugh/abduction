@@ -1,3 +1,4 @@
+pub mod background;
 pub mod brain;
 pub mod gen;
 pub mod manager;
@@ -68,6 +69,9 @@ pub enum EntityMarker {
     /// This entity represents a fire
     /// which can spread and be put-out
     Fire,
+
+    /// This entity represents somewhere an entity can shelter
+    Shelter,
 }
 
 pub type EntityId = String; // TODO: use a uuid
@@ -109,9 +113,6 @@ pub struct EntityAttributes {
 
     /// If set, this entity is an infinite water source
     pub water_source: Option<EntityWaterSource>,
-
-    /// If set, this entity is somewhere you can shelter
-    pub shelter: Option<EntityShelter>,
 
     /// The current details of the world
     pub world: Option<EntityWorld>,
@@ -281,11 +282,6 @@ impl EntityFood {
         }
     }
 }
-
-/// WIP but this signals somewhere a player can shelter
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[qubit::ts]
-pub struct EntityShelter;
 
 /// An infinite water source
 /// All water is just as good at quenching thirst and all water sources are infinite

@@ -657,7 +657,7 @@ impl Entity {
                 let Some(shelter_entity) = ctx
                     .entities
                     .in_hex(my_hex)
-                    .find(|e| e.attributes.shelter.is_some())
+                    .find(|e| has_markers!(e, Shelter))
                 else {
                     return PlayerActionResult::NoEffect;
                 };
