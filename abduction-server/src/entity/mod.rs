@@ -16,6 +16,7 @@ use uuid::Uuid;
 
 use crate::{
     entity::{
+        background::EntityBackground,
         brain::{
             characteristic::{Characteristic, CharacteristicStrength},
             focus::PlayerFocus,
@@ -127,6 +128,9 @@ pub struct EntityAttributes {
     /// The value is a % out of 100 for use in HSL
     /// (e.g for player dots)
     pub display_color_hue: Option<f32>,
+
+    /// Optionally, a background
+    pub background: Option<EntityBackground>,
 
     /// Optionally, a table of memes (like memetic sharable memories / knowledge)
     #[serde(flatten)]

@@ -1,3 +1,4 @@
+pub mod background;
 pub mod corpse;
 pub mod player;
 pub mod prop;

@@ -1,7 +1,9 @@
-use serde::{Deserialize, Serialize};
+use serde::{de::Visitor, Deserialize, Serialize};
+use strum::VariantArray;
 
-#[derive(Debug, Clone, Serialize, Deserialize, strum::VariantArray)]
+#[derive(Debug, Clone, strum::VariantArray, strum::IntoStaticStr)]
 #[allow(clippy::enum_variant_names)]
+#[qubit::ts]
 pub enum Career {
     // technical / software / industrial
     SoftwareEngineer,
@@ -323,4 +325,67 @@ pub enum Career {
     UrbanEcologist,
     EnvironmentalPolicyAnalyst,
     WildlifeConservationist,
+}
+
+fn lower_with_spaces(s: String) -> String {
+    s.chars()
+        .enumerate()
+        .map(|(i, c)| {
+            if i > 0 && c.is_uppercase() {
+                format!(" {}", c.to_lowercase())
+            } else {
+                c.to_ascii_lowercase().to_string()
+            }
+        })
+        .collect::<String>()
+}
+
+/// I really don't like doing this every time we serialize :(
+/// would love to just have this be a static lookup...
+/// TODO: improve all this
+impl Serialize for Career {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let display = format!("{self:?}");
+        let with_spaces = lower_with_spaces(display);
+        serializer.serialize_str(&with_spaces)
+    }
+}
+
+/// This is inefficiently implemented but it should happen rarely
+impl<'de> Deserialize<'de> for Career {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct CareerVisitor;
+
+        impl<'de> Visitor<'de> for CareerVisitor {
+            type Value = Career;
+
+            fn expecting(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+                fmt.write_str("a career name in lowercase with spaces")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                // Consider each variant
+                for variant in Career::VARIANTS.iter() {
+                    let discriminator: &'static str = variant.into();
+                    let with_spaces = lower_with_spaces(discriminator.to_string());
+                    if with_spaces == v {
+                        return Ok(variant.to_owned());
+                    }
+                }
+
+                Err(E::custom(format!("unknown career: {v}")))
+            }
+        }
+
+        deserializer.deserialize_str(CareerVisitor)
+    }
 }

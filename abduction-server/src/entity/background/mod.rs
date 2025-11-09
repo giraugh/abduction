@@ -9,20 +9,21 @@ pub mod hope;
 ///
 /// mostly for flavour and style but also has some mechanical effects (mostly focused on career)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[qubit::ts]
 pub struct EntityBackground {
     // Origin
-    country_name: String,
-    city_name: String,
+    pub country_name: String,
+    pub city_name: String,
 
     // Mechanical
-    career: career::Career,
-    is_retired: bool,
+    pub career: career::Career,
+    pub is_retired: bool,
 
     // Physical
-    eye_colour: String,
-    hair_colour: String,
+    pub eye_colour: String,
+    pub hair_colour: String,
 
     // Personal stuff
-    fear: fear::Fear,
-    hope: hope::Hope,
+    pub fear: fear::Fear,
+    pub hope: hope::Hope,
 }

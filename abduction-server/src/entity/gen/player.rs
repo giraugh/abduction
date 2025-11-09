@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use rand::prelude::*;
 use std::collections::HashMap;
 #[cfg(not(test))]
@@ -10,6 +10,7 @@ use std::{io::SeekFrom, os::unix::fs::MetadataExt, path::PathBuf};
 use strum::IntoEnumIterator;
 
 use crate::create_markers;
+use crate::entity::background::EntityBackground;
 use crate::entity::brain::characteristic::{Characteristic, CharacteristicStrength};
 use crate::entity::brain::motivator::MotivatorTable;
 use crate::entity::{Entity, EntityAttributes};
@@ -25,6 +26,8 @@ static PLAYER_DATA_DIR: LazyLock<PathBuf> =
 
 static FAMILY_NAMES_PATH: LazyLock<PathBuf> =
     LazyLock::new(|| PLAYER_DATA_DIR.join("family_names.txt"));
+
+static CITIES_PATH: LazyLock<PathBuf> = LazyLock::new(|| PLAYER_DATA_DIR.join("cities.txt"));
 
 // Player gen constants
 const PLAYER_AGE_RANGE: std::ops::Range<usize> = 18..100;
@@ -78,6 +81,9 @@ pub fn generate_player() -> anyhow::Result<Entity> {
     // but we could align this with alliances etc later
     attributes.display_color_hue = Some(rng.random_range(0.0..360.0));
 
+    // Generate a background
+    attributes.background = Some(EntityBackground::random_for_age(&mut rng, age));
+
     // Generate random weak/strong attributes for a small number of characteristics
     // (most are average because most people are average at most things...)
     const UNIQUE_CHAR_COUNT: usize = 5;
@@ -117,6 +123,15 @@ pub fn generate_player() -> anyhow::Result<Entity> {
     };
 
     Ok(player_entity)
+}
+
+/// get a random (city, country) pair from the player data
+pub fn random_city_country_pair() -> anyhow::Result<(String, String)> {
+    let line = random_line_from_text_file(&CITIES_PATH)?;
+    let (city, country) = line
+        .split_once(":")
+        .ok_or(anyhow!("Malformed city/country line"))?;
+    Ok((city.to_owned(), country.to_owned()))
 }
 
 /// Get a random name from a text file, without loading
