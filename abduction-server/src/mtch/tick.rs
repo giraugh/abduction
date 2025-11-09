@@ -6,7 +6,7 @@ use crate::{
     create_markers,
     entity::{
         brain::{
-            actor_action::{ActorAction, ActorActionSideEffect},
+            actor_action::{ActorAction, ActorActionResult, ActorActionSideEffect},
             focus::ActorFocus,
             motivator,
         },
@@ -406,10 +406,20 @@ impl MatchManager {
         action: ActorAction,
     ) {
         let result = entity.resolve_action(action, ctx);
+
+        // Players get bored when they dont do anything
+        if has_markers!(entity, Player) {
+            if matches!(result, ActorActionResult::NoEffect) {
+                entity
+                    .attributes
+                    .motivators
+                    .bump_scaled::<motivator::Boredom>(2.0);
+            } else {
+                entity.attributes.motivators.clear::<motivator::Boredom>();
+            }
+        }
+
         let side_effect = result.side_effect();
-
-        // TODO: boredom bit used to be here but ehh, not sure if we want that anyway
-
         Self::resolve_action_side_effect(entities, rng, entity, side_effect);
     }
 }

@@ -108,6 +108,9 @@ pub enum ActorAction {
 
     /// Head towards water if we know where some is
     SeekKnownWaterSource,
+
+    /// "Warp in" some entity thats currently banished
+    WarpInEntity(EntityId),
 }
 
 #[derive(Clone, Debug)]

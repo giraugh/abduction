@@ -6,10 +6,20 @@ export type GameLogLevel = 'global' | 'local';
 export type BarkSeverity = 'moderate' | 'severe';
 
 /** Given a game log, determine how important it is */
-export function logLevel(log: GameLog) {
+export function logLevel(log: GameLog, game: Game) {
 	if (log.involved_entities.length === 0) return 'global';
 	if (log.kind === 'entity_death') return 'global';
 	if (log.kind === 'lightning_strike') return 'global';
+	if (log.kind === 'entity_warp_in' || log.kind === 'entity_warp_out') return 'global';
+
+	// Anything done by crew is global
+	if (
+		game?.entities &&
+		log.involved_entities.some((id) => game.entities.get(id)?.markers.includes('crew'))
+	) {
+		return 'global';
+	}
+
 	return 'local';
 }
 
@@ -239,5 +249,13 @@ export function logMessage(log: GameLog, game: Game) {
 
 	if (log.kind === 'entity_leave_shelter') {
 		return `${primaryName} exits the shelter of ${secondaryName}`;
+	}
+
+	if (log.kind === 'entity_warp_in') {
+		return `${primaryName} warps in ${secondaryName}`;
+	}
+
+	if (log.kind === 'entity_warp_out') {
+		return `${primaryName} warps out ${secondaryName}`;
 	}
 }

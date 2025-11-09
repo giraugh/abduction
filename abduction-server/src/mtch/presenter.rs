@@ -23,6 +23,7 @@ use crate::{
         },
         Entity, EntityAttributes,
     },
+    has_markers,
     hex::AxialHex,
     mtch::ActionCtx,
 };
@@ -106,7 +107,7 @@ impl Entity {
     pub fn get_next_action_as_presenter<'a>(
         &'a self,
         ctx: &ActionCtx,
-        event_signals: impl Iterator<Item = SignalRef<'a>>,
+        _event_signals: impl Iterator<Item = SignalRef<'a>>,
     ) -> ActorAction {
         // First off, are we truly a presenter? Grab our state
         let Some(EntityPresenter { .. }) = self.attributes.presenter else {
@@ -114,14 +115,23 @@ impl Entity {
             return ActorAction::Nothing;
         };
 
-        // For now do nothing
+        // For now, each action just warp in one player
+        // is there a player needing unbanished?
+        if let Some(to_warp_entity) = ctx
+            .entities
+            .all()
+            .find(|e| e.attributes.hex.is_none() && has_markers!(e, Player))
+        {
+            return ActorAction::WarpInEntity(to_warp_entity.entity_id.clone());
+        }
+
         ActorAction::Nothing
     }
 
     pub fn get_next_action_as_collector<'a>(
         &'a self,
         ctx: &ActionCtx,
-        event_signals: impl Iterator<Item = SignalRef<'a>>,
+        _event_signals: impl Iterator<Item = SignalRef<'a>>,
     ) -> ActorAction {
         // First off, are we truly a collector? Grab our state
         let Some(EntityCollector { .. }) = self.attributes.collector else {
@@ -129,7 +139,21 @@ impl Entity {
             return ActorAction::Nothing;
         };
 
-        // For now do nothing
+        // Find the nearest player corpse if present
+        if let Some(corpse_entity) = ctx
+            .entities
+            .all()
+            .filter(|e| e.attributes.corpse.is_some() && e.attributes.hex.is_some())
+            .min_by_key(|e| {
+                e.attributes
+                    .hex
+                    .unwrap()
+                    .dist_to(self.attributes.hex.unwrap())
+            })
+        {
+            return ActorAction::GoTowardsHex(corpse_entity.attributes.hex.unwrap());
+        };
+
         ActorAction::Nothing
     }
 }

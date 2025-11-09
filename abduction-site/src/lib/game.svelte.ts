@@ -52,7 +52,7 @@ export class Game {
 		this.logs.push({
 			...log,
 			message: logMessage(log, this) ?? '...',
-			level: logLevel(log),
+			level: logLevel(log, this),
 			// @ts-ignore
 			involved_hexes: log.involved_entities
 				.map((e) => this.entities.get(e)?.attributes.hex)

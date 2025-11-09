@@ -23,7 +23,7 @@ use crate::{
     },
     event::{builder::GameEventBuilder, GameEventKind, GameEventTarget},
     has_markers,
-    hex::AxialHexDirection,
+    hex::{AxialHex, AxialHexDirection},
     logs::{AsEntityId, GameLog, GameLogBody},
     mtch::ActionCtx,
 };
@@ -79,6 +79,9 @@ impl Entity {
         let Some(my_hex) = self.attributes.hex else {
             return ActorActionResult::NoEffect;
         };
+
+        // Prep randomness
+        let mut rng = rand::rng();
 
         match &action {
             ActorAction::Nothing => {
@@ -237,8 +240,6 @@ impl Entity {
             }
 
             ActorAction::MoveAwayFrom(log_body, markers) => {
-                let mut rng = rand::rng();
-
                 // Get entities at my location with that marker
                 let avoid_entities = ctx
                     .entities
@@ -264,8 +265,6 @@ impl Entity {
             }
 
             ActorAction::GoToAdjacent(log_body, markers) => {
-                let mut rng = rand::rng();
-
                 // Is the current hex such a hex?
                 let current_hex_valid = ctx
                     .entities
@@ -461,7 +460,6 @@ impl Entity {
                 try_morally_wrong,
             } => {
                 // Is there food at this location?
-                let mut rng = rand::rng();
                 let food_entities =
                     ctx.entities
                         .in_hex(my_hex)
@@ -516,7 +514,6 @@ impl Entity {
 
             ActorAction::DrinkFromWaterSource { try_dubious } => {
                 // Is there food at this location?
-                let mut rng = rand::rng();
                 let water_source_entities = ctx
                     .entities
                     .in_hex(my_hex)
@@ -732,6 +729,22 @@ impl Entity {
 
                 // Go towards that
                 return self.resolve_action(ActorAction::GoTowardsHex(shelter_loc), ctx);
+            }
+
+            ActorAction::WarpInEntity(entity_id) => {
+                // Basically we just unbanish that entity to some location near the origin w/ a log
+                let warp_hex = AxialHex::random_in_bounds(&mut rng, 3);
+
+                ctx.send_log(GameLog::entity_pair(
+                    self,
+                    entity_id,
+                    GameLogBody::EntityWarpIn,
+                ));
+
+                return ActorActionResult::SideEffect(ActorActionSideEffect::UnbanishOther(
+                    entity_id.clone(),
+                    warp_hex,
+                ));
             }
 
             // Moving in a given hex direction

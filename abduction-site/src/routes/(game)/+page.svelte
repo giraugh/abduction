@@ -89,7 +89,7 @@
 	const hexCounts = $derived.by(() => {
 		return game.entities
 			.values()
-			.filter((e) => e.markers.includes('inspectable') && e.attributes.hex !== null)
+			.filter((e) => e.markers.includes('inspectable') && e.attributes.hex !== undefined)
 			.map((e) => e.attributes.hex!)
 			.map((h) => `${h[0]}:${h[1]}`)
 			.reduce(

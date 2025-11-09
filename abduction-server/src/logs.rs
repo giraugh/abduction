@@ -199,6 +199,12 @@ pub enum GameLogBody {
     /// The primary entity left the shelter of the secondary entity
     EntityLeaveShelter,
 
+    /// The primary entity warps in the secondary entity to some game hex
+    EntityWarpIn,
+
+    /// The primary entity warps out the secondary entity from some game hex
+    EntityWarpOut,
+
     /// Entity A (a hazard) hurts entity B
     HazardHurt,
 }
