@@ -13,7 +13,7 @@
 /// - The match will then be scheduled but not run until the Monday.
 /// - Add queries and UI such that players can see the next upcoming match.
 pub mod config;
-pub mod presenter;
+pub mod crew;
 pub mod tick;
 
 use anyhow::Context;
@@ -33,7 +33,7 @@ use crate::{
     has_markers,
     location::{generate_locations_for_world, Biome},
     logs::GameLog,
-    mtch::presenter::{generate_collector, generate_presenter},
+    mtch::crew::{generate_collector, generate_presenter},
     Db, ServerCtx,
 };
 

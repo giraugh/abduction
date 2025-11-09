@@ -205,6 +205,10 @@ pub enum GameLogBody {
     /// The primary entity warps out the secondary entity from some game hex
     EntityWarpOut,
 
+    /// The primary entity says an exact quote
+    /// used by crew
+    EntitySayExact { quote: String },
+
     /// Entity A (a hazard) hurts entity B
     HazardHurt,
 }

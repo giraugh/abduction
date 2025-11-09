@@ -102,6 +102,11 @@ impl Entity {
                 return ActorActionResult::NoEffect;
             }
 
+            ActorAction::IgnoreResult(action) => {
+                self.resolve_action(*action.clone(), ctx);
+                return ActorActionResult::NoEffect;
+            }
+
             ActorAction::Sequential(sub_actions) => {
                 for sub_action in sub_actions {
                     match self.resolve_action(sub_action.clone(), ctx) {
@@ -160,10 +165,6 @@ impl Entity {
             ActorAction::ReduceMotivator(key) => {
                 self.attributes.motivators.reduce_key(*key);
                 return ActorActionResult::Ok;
-            }
-
-            ActorAction::Discussion(discussion_action) => {
-                return self.resolve_discussion_action(discussion_action, ctx)
             }
 
             ActorAction::WakeUp => {
@@ -788,6 +789,15 @@ impl Entity {
                         GameLogBody::EntityMovement { by: *hex_direction },
                     ));
                 }
+            }
+
+            // Got a few down here which just proxy elsewhere
+            ActorAction::Discussion(discussion_action) => {
+                return self.resolve_discussion_action(discussion_action, ctx)
+            }
+
+            ActorAction::Presenter(presenter_action) => {
+                return self.resolve_presenter_action(presenter_action, ctx)
             }
         }
 

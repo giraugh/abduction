@@ -17,14 +17,15 @@ use crate::{
     create_markers,
     entity::{
         brain::{
-            actor_action::ActorAction,
+            actor_action::{ActorAction, ActorActionResult},
             characteristic::{Characteristic, CharacteristicStrength},
             signal::SignalRef,
         },
-        Entity, EntityAttributes,
+        Entity, EntityAttributes, EntityId,
     },
     has_markers,
     hex::AxialHex,
+    logs::{GameLog, GameLogBody},
     mtch::ActionCtx,
 };
 
@@ -91,16 +92,35 @@ pub fn generate_collector() -> Entity {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[qubit::ts]
 pub struct EntityPresenter {
-    // TODO
+    wait: usize,
+}
+
+impl Default for EntityPresenter {
+    fn default() -> Self {
+        Self { wait: 10 }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[qubit::ts]
 pub struct EntityCollector {
     // TODO
+}
+
+#[derive(Debug, Clone)]
+pub enum PresenterAction {
+    Wait,
+    StartWaiting(usize),
+    IntroducePlayer(EntityId),
+}
+
+impl From<PresenterAction> for ActorAction {
+    fn from(value: PresenterAction) -> Self {
+        ActorAction::Presenter(value)
+    }
 }
 
 impl Entity {
@@ -110,10 +130,15 @@ impl Entity {
         _event_signals: impl Iterator<Item = SignalRef<'a>>,
     ) -> ActorAction {
         // First off, are we truly a presenter? Grab our state
-        let Some(EntityPresenter { .. }) = self.attributes.presenter else {
+        let Some(presenter @ EntityPresenter { .. }) = &self.attributes.presenter else {
             warn!("Non-presenter tried to act as presenter");
             return ActorAction::Nothing;
         };
+
+        // Waiting? We give some ticks between actions to allow time
+        if presenter.wait > 0 {
+            return ActorAction::Presenter(PresenterAction::Wait);
+        }
 
         // For now, each action just warp in one player
         // is there a player needing unbanished?
@@ -122,10 +147,52 @@ impl Entity {
             .all()
             .find(|e| e.attributes.hex.is_none() && has_markers!(e, Player))
         {
-            return ActorAction::WarpInEntity(to_warp_entity.entity_id.clone());
+            return ActorAction::Sequential(vec![
+                ActorAction::ignore(
+                    PresenterAction::IntroducePlayer(to_warp_entity.entity_id.clone()).into(),
+                ),
+                PresenterAction::StartWaiting(10).into(),
+                ActorAction::WarpInEntity(to_warp_entity.entity_id.clone()),
+            ]);
         }
 
         ActorAction::Nothing
+    }
+
+    pub fn resolve_presenter_action(
+        &mut self,
+        action: &PresenterAction,
+        ctx: &ActionCtx,
+    ) -> ActorActionResult {
+        match action {
+            PresenterAction::Wait => {
+                self.attributes.presenter.as_mut().unwrap().wait -= 1;
+                ActorActionResult::Ok
+            }
+            PresenterAction::StartWaiting(ticks) => {
+                self.attributes.presenter.as_mut().unwrap().wait = *ticks;
+                ActorActionResult::NoEffect // this can be chained to start waiting afterwards
+            }
+            PresenterAction::IntroducePlayer(entity_id) => {
+                let player_entity = ctx.entities.by_id(entity_id).unwrap();
+                let name = player_entity.attributes.first_name.as_ref().unwrap();
+                let bg = player_entity.attributes.background.as_ref().unwrap();
+                let retired = if bg.is_retired { "retired " } else { "" };
+                let career = bg.career.to_string();
+                let location = bg.location_string();
+
+                ctx.send_log(GameLog::entity(
+                    self,
+                    GameLogBody::EntitySayExact {
+                        quote: format!(
+                            "Next up we have {name}. A {retired}{career} warping in from {location}"
+                        ),
+                    },
+                ));
+
+                ActorActionResult::Ok
+            }
+        }
     }
 
     pub fn get_next_action_as_collector<'a>(

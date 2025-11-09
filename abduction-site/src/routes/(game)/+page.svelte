@@ -38,6 +38,7 @@
 		if (entity.attributes.food !== undefined) return '🍽️';
 		if (entity.attributes.water_source !== undefined) return '🌊';
 		if (entity.markers.includes('shelter')) return '🚪';
+		if (entity.markers.includes('alien')) return '👽';
 
 		return '';
 	}
@@ -224,7 +225,9 @@
 		</ul>
 		<ul class="logs">
 			{#each logView as log (log.id)}
-				<li class:global={log.level === 'global'}>{log.message}</li>
+				<li class:quote={log.kind === 'entity_say_exact'} class:global={log.level === 'global'}>
+					{log.message}
+				</li>
 			{/each}
 			<div id="log-anchor"></div>
 		</ul>
@@ -431,7 +434,7 @@
 	}
 
 	.logs {
-		height: 15em;
+		height: 30em;
 		box-shadow: inset 0px 0px 6px 1px #111;
 		border-radius: 0.3em;
 
@@ -461,6 +464,16 @@
 				padding-inline: 0.3em;
 				background: #555;
 				margin-block: 0.2em;
+			}
+
+			&.quote {
+				font-weight: initial !important;
+				background: none;
+				border: 1px solid #555;
+				padding: 0.75em;
+				margin-block: 0.5em;
+				color: #888;
+				font-size: 0.85rem;
 			}
 
 			&:not(.global) {

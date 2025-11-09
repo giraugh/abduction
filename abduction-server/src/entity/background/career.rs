@@ -340,6 +340,13 @@ fn lower_with_spaces(s: String) -> String {
         .collect::<String>()
 }
 
+impl ToString for Career {
+    fn to_string(&self) -> String {
+        let discriminator: &'static str = self.into();
+        lower_with_spaces(discriminator.to_string())
+    }
+}
+
 /// I really don't like doing this every time we serialize :(
 /// would love to just have this be a static lookup...
 /// TODO: improve all this

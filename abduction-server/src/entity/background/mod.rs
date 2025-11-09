@@ -27,3 +27,9 @@ pub struct EntityBackground {
     pub fear: fear::Fear,
     pub hope: hope::Hope,
 }
+
+impl EntityBackground {
+    pub fn location_string(&self) -> String {
+        format!("{}, {}", self.city_name, self.country_name)
+    }
+}

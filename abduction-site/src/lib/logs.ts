@@ -258,4 +258,8 @@ export function logMessage(log: GameLog, game: Game) {
 	if (log.kind === 'entity_warp_out') {
 		return `${primaryName} warps out ${secondaryName}`;
 	}
+
+	if (log.kind === 'entity_say_exact') {
+		return `${primaryName}: "${log.quote}"`;
+	}
 }

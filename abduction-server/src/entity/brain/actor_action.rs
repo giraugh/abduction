@@ -2,6 +2,7 @@ use crate::entity::brain::focus::ActorFocus;
 use crate::entity::{EntityId, EntityMarker};
 use crate::hex::{AxialHex, AxialHexDirection};
 use crate::logs::GameLogBody;
+use crate::mtch::crew::PresenterAction;
 
 use super::discussion::DiscussionAction;
 use super::motivator::MotivatorKey;
@@ -14,6 +15,12 @@ pub enum ActorAction {
     /// (This always causes the "NoEffect" result)
     Nothing,
 
+    /// Do some action but always return "NoEffect" so we can chain more
+    IgnoreResult(Box<ActorAction>),
+
+    /// Try each action in the list until one works
+    Sequential(Vec<ActorAction>),
+
     /// Add some specific entity to the inventory, if there is room
     PickUpEntity(EntityId),
 
@@ -25,9 +32,6 @@ pub enum ActorAction {
 
     /// Decrease some motivator by the sensitivity
     ReduceMotivator(MotivatorKey),
-
-    /// Try each action in the list until one works
-    Sequential(Vec<ActorAction>),
 
     /// Greet some specific entity
     /// (go up to them and say hello type beat)
@@ -46,6 +50,9 @@ pub enum ActorAction {
 
     /// When in a discussion focus, do related actions
     Discussion(DiscussionAction),
+
+    /// When a presenter, do presenter actions
+    Presenter(PresenterAction),
 
     /// Travel towards a given hex
     /// NOTE: if already at the location, this will do nothing (and cause NoEffect)
@@ -124,6 +131,12 @@ pub enum ActorActionResult {
 
     /// Action succeeded (even if nothing happens)
     Ok,
+}
+
+impl ActorAction {
+    pub fn ignore(action: ActorAction) -> ActorAction {
+        ActorAction::IgnoreResult(Box::new(action))
+    }
 }
 
 impl ActorActionResult {
