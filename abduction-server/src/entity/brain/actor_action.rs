@@ -1,4 +1,4 @@
-use crate::entity::brain::focus::PlayerFocus;
+use crate::entity::brain::focus::ActorFocus;
 use crate::entity::{EntityId, EntityMarker};
 use crate::hex::{AxialHex, AxialHexDirection};
 use crate::logs::GameLogBody;
@@ -8,9 +8,9 @@ use super::motivator::MotivatorKey;
 
 #[derive(Clone, Debug)]
 #[allow(unused)]
-pub enum PlayerAction {
+pub enum ActorAction {
     /// No-op
-    /// "<player> twiddles their thumbs" etc
+    /// "<actor> twiddles their thumbs" etc
     /// (This always causes the "NoEffect" result)
     Nothing,
 
@@ -27,7 +27,7 @@ pub enum PlayerAction {
     ReduceMotivator(MotivatorKey),
 
     /// Try each action in the list until one works
-    Sequential(Vec<PlayerAction>),
+    Sequential(Vec<ActorAction>),
 
     /// Greet some specific entity
     /// (go up to them and say hello type beat)
@@ -61,7 +61,7 @@ pub enum PlayerAction {
     /// NOTE: requires a log that will be emited interstitially if a suitable hex can be found
     GoToAdjacent(GameLogBody, Vec<EntityMarker>),
 
-    /// If there is an entity with one of the given tags at current location, player will move elsewhere
+    /// If there is an entity with one of the given tags at current location, the actor will move elsewhere
     /// NOTE: requires a log that will be emited interstitially if a suitable hex can be found
     MoveAwayFrom(GameLogBody, Vec<EntityMarker>),
 
@@ -111,9 +111,9 @@ pub enum PlayerAction {
 }
 
 #[derive(Clone, Debug)]
-pub enum PlayerActionResult {
-    /// Something that happens to the world as a result of player action
-    SideEffect(PlayerActionSideEffect),
+pub enum ActorActionResult {
+    /// Something that happens to the world as a result of an actor action
+    SideEffect(ActorActionSideEffect),
 
     /// Action had no effect
     /// (e.g try to eat food but there isnt any)
@@ -123,23 +123,21 @@ pub enum PlayerActionResult {
     Ok,
 }
 
-impl PlayerActionResult {
+impl ActorActionResult {
     /// Get the side effect if there is one
-    pub fn side_effect(self) -> Option<PlayerActionSideEffect> {
+    pub fn side_effect(self) -> Option<ActorActionSideEffect> {
         match self {
-            PlayerActionResult::SideEffect(player_action_side_effect) => {
-                Some(player_action_side_effect)
-            }
-            PlayerActionResult::NoEffect => None,
-            PlayerActionResult::Ok => None,
+            ActorActionResult::SideEffect(action_side_effect) => Some(action_side_effect),
+            ActorActionResult::NoEffect => None,
+            ActorActionResult::Ok => None,
         }
     }
 }
 
-/// Something that happens to the world as a result of player action
+/// Something that happens to the world as a result of an action
 #[derive(Clone, Debug)]
-pub enum PlayerActionSideEffect {
-    /// The player itself dies
+pub enum ActorActionSideEffect {
+    /// The actor itself dies
     Death,
 
     /// Remove some other entity (e.g when eating food)
@@ -155,14 +153,14 @@ pub enum PlayerActionSideEffect {
     /// Set some other entities focus
     SetFocus {
         entity_id: EntityId,
-        focus: PlayerFocus,
+        focus: ActorFocus,
     },
 }
 
-impl PlayerAction {
+impl ActorAction {
     #[inline(always)]
     pub const fn all_movements() -> &'static [Self] {
-        use PlayerAction::*;
+        use ActorAction::*;
         &[
             Move(AxialHexDirection::East),
             Move(AxialHexDirection::NorthEast),

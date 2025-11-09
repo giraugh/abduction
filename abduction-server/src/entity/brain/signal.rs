@@ -1,7 +1,7 @@
 use rand::distr::{weighted::WeightedIndex, Distribution};
 
 use crate::entity::{
-    brain::{focus::PlayerFocus, player_action::PlayerAction},
+    brain::{actor_action::ActorAction, focus::ActorFocus},
     snapshot::EntityView,
     world::EntityWorld,
     Entity,
@@ -18,7 +18,7 @@ pub struct SignalContext<'a> {
     pub entity: &'a Entity,
 
     /// The current focus of the entity having its signal resolved
-    pub focus: PlayerFocus,
+    pub focus: ActorFocus,
 
     /// The current world state
     pub world_state: &'a EntityWorld,
@@ -26,7 +26,7 @@ pub struct SignalContext<'a> {
 
 /// Something that a player acts on -> can raise weighted actions
 pub trait Signal: std::fmt::Debug {
-    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedPlayerActions);
+    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions);
 }
 
 /// Helper for a dynamic signal object. This allows for wrapping and owning where required (`Boxed`) or
@@ -48,7 +48,7 @@ impl<'a> SignalRef<'a> {
 }
 
 impl Signal for SignalRef<'_> {
-    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedPlayerActions) {
+    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         match self {
             SignalRef::Boxed(signal) => signal.act_on(ctx, actions),
             SignalRef::Ref(signal) => signal.act_on(ctx, actions),
@@ -58,15 +58,15 @@ impl Signal for SignalRef<'_> {
 
 /// Actions and their weights as returned by a signal implementor
 #[derive(Debug, Clone, Default)]
-pub struct WeightedPlayerActions {
-    actions: Option<Vec<(usize, PlayerAction)>>,
+pub struct WeightedActorActions {
+    actions: Option<Vec<(usize, ActorAction)>>,
 }
 
-impl WeightedPlayerActions {
-    pub fn sample(mut self, rng: &mut impl rand::Rng) -> PlayerAction {
+impl WeightedActorActions {
+    pub fn sample(mut self, rng: &mut impl rand::Rng) -> ActorAction {
         // Add no-op if no actions
         if self.actions.is_none() {
-            self.add(1, PlayerAction::Nothing);
+            self.add(1, ActorAction::Nothing);
         }
 
         // Build the distribution
@@ -78,12 +78,12 @@ impl WeightedPlayerActions {
     }
 }
 
-impl WeightedPlayerActions {
-    pub fn add(&mut self, weight: usize, action: PlayerAction) {
+impl WeightedActorActions {
+    pub fn add(&mut self, weight: usize, action: ActorAction) {
         self.actions.get_or_insert_default().push((weight, action));
     }
 
-    pub fn extend(&mut self, actions: impl Iterator<Item = (usize, PlayerAction)>) {
+    pub fn extend(&mut self, actions: impl Iterator<Item = (usize, ActorAction)>) {
         self.actions.get_or_insert_default().extend(actions);
     }
 }

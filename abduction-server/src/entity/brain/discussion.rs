@@ -4,7 +4,7 @@ use tracing::warn;
 
 use crate::{
     entity::{
-        brain::{focus::PlayerFocus, motivator, PlayerActionResult},
+        brain::{focus::ActorFocus, motivator, ActorActionResult},
         Entity,
     },
     logs::{GameLog, GameLogBody},
@@ -119,35 +119,35 @@ impl Entity {
         &mut self,
         action: &DiscussionAction,
         ctx: &ActionCtx,
-    ) -> PlayerActionResult {
+    ) -> ActorActionResult {
         // Get a reference to the discussion focus
-        let Some(PlayerFocus::Discussion {
+        let Some(ActorFocus::Discussion {
             ref mut interest,
             with,
         }) = self.attributes.focus.as_mut()
         else {
             warn!("Attempted to resolve discussion action but not in a discussion");
-            return PlayerActionResult::NoEffect;
+            return ActorActionResult::NoEffect;
         };
 
         // if other is no longer in the discussion, we need to leave too
         // and discard whatever we were going to do
         let Some(with_entity) = ctx.entities.by_id(with) else {
             warn!("Entity being discussed with does not exist");
-            self.attributes.focus = Some(PlayerFocus::Unfocused);
-            return PlayerActionResult::NoEffect;
+            self.attributes.focus = Some(ActorFocus::Unfocused);
+            return ActorActionResult::NoEffect;
         };
         match with_entity.attributes.focus.as_ref() {
             // Talking with us?
-            Some(PlayerFocus::Discussion {
+            Some(ActorFocus::Discussion {
                 with: other_with, ..
             }) if other_with == &self.entity_id => {}
 
             // Not talking / not with us?
             _ => {
-                self.attributes.focus = Some(PlayerFocus::Unfocused);
+                self.attributes.focus = Some(ActorFocus::Unfocused);
                 // NOTE: don't do a log because its no-longer guaranteed we are still near them
-                return PlayerActionResult::NoEffect;
+                return ActorActionResult::NoEffect;
             }
         }
 
@@ -157,14 +157,14 @@ impl Entity {
         // if fully uninterested, leave the discussion
         // discarding what we do otherwise
         if *interest == 0 {
-            self.attributes.focus = Some(PlayerFocus::Unfocused);
+            self.attributes.focus = Some(ActorFocus::Unfocused);
             ctx.send_log(GameLog::entity_pair(
                 self,
                 with_entity,
                 GameLogBody::EntityFarewell,
             ));
 
-            return PlayerActionResult::NoEffect;
+            return ActorActionResult::NoEffect;
         }
 
         // Now actually resolve the action
@@ -207,6 +207,6 @@ impl Entity {
             }
         }
 
-        PlayerActionResult::NoEffect
+        ActorActionResult::NoEffect
     }
 }

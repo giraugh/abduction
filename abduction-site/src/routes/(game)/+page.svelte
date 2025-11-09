@@ -202,7 +202,9 @@
 					entity.attributes.hex !== undefined &&
 					sameHex(entity.attributes.hex, focusedHex)}
 				{@const isFocusedEntity = focusedEntityId && entity.entity_id === focusedEntityId}
-				{@const canSeeGlobally = entity.markers.includes('inspectable') || showAllEntities}
+				{@const isBanished = entity.attributes.hex === undefined}
+				{@const canSeeGlobally =
+					(entity.markers.includes('inspectable') && !isBanished) || showAllEntities}
 				{@const showGlobal = focus?.kind !== 'hex'}
 				{#if showGlobal ? canSeeGlobally : inFocusedHex}
 					<li>

@@ -19,7 +19,7 @@ use crate::{
         background::EntityBackground,
         brain::{
             characteristic::{Characteristic, CharacteristicStrength},
-            focus::PlayerFocus,
+            focus::ActorFocus,
             meme::MemeTable,
             motivator::MotivatorTable,
         },
@@ -28,6 +28,7 @@ use crate::{
     },
     hex::AxialHex,
     location::LocationKind,
+    mtch::presenter::{EntityCollector, EntityPresenter},
 };
 
 /// These are sort of tags that can be associated with an entity
@@ -56,6 +57,12 @@ pub enum EntityMarker {
 
     /// A being that is a human
     Human,
+
+    /// A being that is an alien
+    Alien,
+
+    /// A member of "the crew" - part of the production team
+    Crew,
 
     /// A being that can talk
     CanTalk,
@@ -119,7 +126,7 @@ pub struct EntityAttributes {
     pub world: Option<EntityWorld>,
 
     /// Current focus
-    pub focus: Option<PlayerFocus>,
+    pub focus: Option<ActorFocus>,
 
     /// Optionally, a set of characteristics
     pub characteristics: Option<HashMap<Characteristic, CharacteristicStrength>>,
@@ -135,6 +142,12 @@ pub struct EntityAttributes {
     /// Optionally, a table of memes (like memetic sharable memories / knowledge)
     #[serde(flatten)]
     pub memes: Option<MemeTable>,
+
+    /// If present, this entity is the presenter
+    pub presenter: Option<EntityPresenter>,
+
+    /// If present, this entity is the collector
+    pub collector: Option<EntityCollector>,
 }
 
 #[skip_serializing_none]
@@ -420,9 +433,8 @@ impl From<Entity> for EntityPayload {
 
 #[macro_export]
 macro_rules! create_markers {
-    ($($markers: expr),*) => {{
-        use $crate::entity::EntityMarker::*;
-        vec![$($markers),*]
+    ($($markers: ident),*) => {{
+        vec![$($crate::entity::EntityMarker::$markers),*]
     }}
 }
 

@@ -1,18 +1,18 @@
 use super::GameEventKind;
 use crate::{
     entity::brain::{
+        actor_action::ActorAction,
         characteristic::Characteristic,
-        focus::PlayerFocus,
+        focus::ActorFocus,
         motivator::MotivatorKey,
-        player_action::PlayerAction,
-        signal::{Signal, SignalContext, WeightedPlayerActions},
+        signal::{Signal, SignalContext, WeightedActorActions},
     },
     event::{GameEvent, GameEventTarget},
     logs::GameLogBody,
 };
 
 impl Signal for GameEvent {
-    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedPlayerActions) {
+    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         // Where did this event *happen*
         let location = match self.target {
             GameEventTarget::Hex(axial_hex) => Some(axial_hex),
@@ -55,7 +55,7 @@ impl Signal for GameEvent {
 
                 // If we are focused on something, we dont notice
                 // (for now)
-                if ctx.focus != PlayerFocus::Unfocused {
+                if ctx.focus != ActorFocus::Unfocused {
                     return;
                 }
 
@@ -71,7 +71,7 @@ impl Signal for GameEvent {
                 if we_are_friendly && !dislike {
                     actions.add(
                         20, // too low?
-                        PlayerAction::GreetEntity {
+                        ActorAction::GreetEntity {
                             entity_id: entity_id.clone(),
                         },
                     );
@@ -85,7 +85,7 @@ impl Signal for GameEvent {
                 {
                     actions.add(
                         40, // too low?
-                        PlayerAction::MournEntity {
+                        ActorAction::MournEntity {
                             entity_id: entity_id.clone(),
                         },
                     );
@@ -96,13 +96,13 @@ impl Signal for GameEvent {
                 if ctx.entity.characteristic(Characteristic::Resolve).is_low() {
                     actions.add(
                         40, // too low?
-                        PlayerAction::Sequential(vec![
-                            PlayerAction::Log {
+                        ActorAction::Sequential(vec![
+                            ActorAction::Log {
                                 other: None,
                                 body: GameLogBody::EntityUpsetByDeath,
                             },
-                            PlayerAction::Bark(1.0, MotivatorKey::Sadness),
-                            PlayerAction::BumpMotivator(MotivatorKey::Sadness),
+                            ActorAction::Bark(1.0, MotivatorKey::Sadness),
+                            ActorAction::BumpMotivator(MotivatorKey::Sadness),
                         ]),
                     );
                 }

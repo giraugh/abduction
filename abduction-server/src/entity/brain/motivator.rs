@@ -6,13 +6,13 @@ use std::collections::HashMap;
 use tracing::warn;
 
 use super::{
-    player_action::PlayerAction,
+    actor_action::ActorAction,
     signal::{Signal, SignalContext, SignalRef},
 };
 use crate::{
     create_markers,
     entity::brain::{
-        discussion::DiscussionAction, focus::PlayerFocus, signal::WeightedPlayerActions,
+        discussion::DiscussionAction, focus::ActorFocus, signal::WeightedActorActions,
     },
     logs::GameLogBody,
 };
@@ -242,25 +242,25 @@ declare_motivators!({
 });
 
 impl Signal for Hunger {
-    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedPlayerActions) {
+    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         match ctx.focus {
-            PlayerFocus::Unfocused => {
+            ActorFocus::Unfocused => {
                 // The generic plan for finding food
-                let seek_food_plan: &[PlayerAction] = &[
-                    PlayerAction::GoToAdjacent(
+                let seek_food_plan: &[ActorAction] = &[
+                    ActorAction::GoToAdjacent(
                         GameLogBody::EntityGoToAdjacentLush,
                         create_markers!(LushLocation),
                     ),
-                    PlayerAction::Bark(self.motivation(), MotivatorKey::Hunger),
+                    ActorAction::Bark(self.motivation(), MotivatorKey::Hunger),
                 ];
 
                 // Eat food if we have it, maybe try finding some
                 if self.motivation() > 0.3 {
                     actions.add(
                         if self.motivation() > 0.7 { 30 } else { 10 },
-                        PlayerAction::Sequential(seq![
-                            PlayerAction::ConsumeNearbyFood { try_dubious: false, try_morally_wrong: false },
-                            PlayerAction::RetrieveInventoryFood;
+                        ActorAction::Sequential(seq![
+                            ActorAction::ConsumeNearbyFood { try_dubious: false, try_morally_wrong: false },
+                            ActorAction::RetrieveInventoryFood;
                             ..seek_food_plan,
                         ]),
                     );
@@ -270,10 +270,10 @@ impl Signal for Hunger {
                 if self.motivation() > 0.6 {
                     actions.add(
                                 if self.motivation() > 0.7 { 30 } else { 10 },
-                                PlayerAction::Sequential(seq![
-                                    PlayerAction::ConsumeNearbyFood { try_dubious: false, try_morally_wrong: false },
-                                    PlayerAction::RetrieveInventoryFood,
-                                    PlayerAction::ConsumeNearbyFood { try_dubious: true, try_morally_wrong: false };
+                                ActorAction::Sequential(seq![
+                                    ActorAction::ConsumeNearbyFood { try_dubious: false, try_morally_wrong: false },
+                                    ActorAction::RetrieveInventoryFood,
+                                    ActorAction::ConsumeNearbyFood { try_dubious: true, try_morally_wrong: false };
                                     ..seek_food_plan,
                                 ]),
                             );
@@ -283,7 +283,7 @@ impl Signal for Hunger {
                 if self.motivation() > 0.9 {
                     actions.add(
                         10,
-                        PlayerAction::ConsumeNearbyFood {
+                        ActorAction::ConsumeNearbyFood {
                             try_dubious: true,
                             try_morally_wrong: true,
                         },
@@ -292,17 +292,17 @@ impl Signal for Hunger {
                 }
 
                 if self.motivation() > 0.9 {
-                    actions.add(20, PlayerAction::BumpMotivator(MotivatorKey::Hurt));
+                    actions.add(20, ActorAction::BumpMotivator(MotivatorKey::Hurt));
                 }
             }
-            PlayerFocus::Discussion { .. } => {
+            ActorFocus::Discussion { .. } => {
                 // Stop talking, im hungry!
                 if self.motivation() > 0.6 {
                     actions.add(
                         if self.motivation() > 0.7 { 30 } else { 10 },
-                        PlayerAction::Sequential(seq![
-                            PlayerAction::Bark(self.motivation(), MotivatorKey::Hunger),
-                            PlayerAction::Discussion(DiscussionAction::LoseInterest),
+                        ActorAction::Sequential(seq![
+                            ActorAction::Bark(self.motivation(), MotivatorKey::Hunger),
+                            ActorAction::Discussion(DiscussionAction::LoseInterest),
                         ]),
                     );
                 }
@@ -313,29 +313,29 @@ impl Signal for Hunger {
 }
 
 impl Signal for Thirst {
-    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedPlayerActions) {
+    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         match ctx.focus {
-            PlayerFocus::Unfocused => {
+            ActorFocus::Unfocused => {
                 // The generic plan for finding water
-                let seek_water_plan: &[PlayerAction] = &[
-                    PlayerAction::SeekKnownWaterSource,
-                    PlayerAction::GoToAdjacent(
+                let seek_water_plan: &[ActorAction] = &[
+                    ActorAction::SeekKnownWaterSource,
+                    ActorAction::GoToAdjacent(
                         GameLogBody::EntityGoToAdjacentLush,
                         create_markers!(LushLocation),
                     ),
-                    PlayerAction::GoTowards(
+                    ActorAction::GoTowards(
                         GameLogBody::EntityGoDownhill,
                         create_markers!(LowLyingLocation),
                     ),
-                    PlayerAction::Bark(self.motivation(), MotivatorKey::Thirst),
+                    ActorAction::Bark(self.motivation(), MotivatorKey::Thirst),
                 ];
 
                 // Little bit thirsty, start trying to get water
                 if self.motivation() > 0.4 {
                     actions.add(
                         20,
-                        PlayerAction::Sequential(seq![
-                            PlayerAction::DrinkFromWaterSource { try_dubious: false }; // Only go in for safe water
+                        ActorAction::Sequential(seq![
+                            ActorAction::DrinkFromWaterSource { try_dubious: false }; // Only go in for safe water
                             ..seek_water_plan,
                         ]),
                     );
@@ -345,26 +345,26 @@ impl Signal for Thirst {
                 if self.motivation() > 0.7 {
                     actions.add(
                         30,
-                        PlayerAction::Sequential(seq![
-                            PlayerAction::DrinkFromWaterSource { try_dubious: false },
-                            PlayerAction::DrinkFromWaterSource { try_dubious: true };
+                        ActorAction::Sequential(seq![
+                            ActorAction::DrinkFromWaterSource { try_dubious: false },
+                            ActorAction::DrinkFromWaterSource { try_dubious: true };
                             ..seek_water_plan,
                         ]),
                     );
                 }
 
                 if self.motivation() > 0.9 {
-                    actions.add(20, PlayerAction::BumpMotivator(MotivatorKey::Hurt));
+                    actions.add(20, ActorAction::BumpMotivator(MotivatorKey::Hurt));
                 }
             }
-            PlayerFocus::Discussion { .. } => {
+            ActorFocus::Discussion { .. } => {
                 // Stop talking, im thirsty!
                 if self.motivation() > 0.6 {
                     actions.add(
                         if self.motivation() > 0.7 { 30 } else { 10 },
-                        PlayerAction::Sequential(seq![
-                            PlayerAction::Bark(self.motivation(), MotivatorKey::Hunger),
-                            PlayerAction::Discussion(DiscussionAction::LoseInterest),
+                        ActorAction::Sequential(seq![
+                            ActorAction::Bark(self.motivation(), MotivatorKey::Hunger),
+                            ActorAction::Discussion(DiscussionAction::LoseInterest),
                         ]),
                     );
                 }
@@ -375,20 +375,20 @@ impl Signal for Thirst {
 }
 
 impl Signal for Boredom {
-    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedPlayerActions) {
+    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         match ctx.focus {
-            PlayerFocus::Unfocused => {
+            ActorFocus::Unfocused => {
                 if self.motivation() > 0.5 {
                     actions.add(
                         2,
-                        PlayerAction::Bark(self.motivation(), MotivatorKey::Boredom),
+                        ActorAction::Bark(self.motivation(), MotivatorKey::Boredom),
                     );
                 }
 
                 // If bored enough, do a random movement
                 if self.motivation() > 0.7 {
                     actions.extend(
-                        PlayerAction::all_movements()
+                        ActorAction::all_movements()
                             .iter()
                             .cloned()
                             .map(|action| (25, action)),
@@ -401,12 +401,12 @@ impl Signal for Boredom {
 }
 
 impl Signal for Hurt {
-    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedPlayerActions) {
+    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         match ctx.focus {
-            PlayerFocus::Unfocused => {
+            ActorFocus::Unfocused => {
                 if self.motivation() > 0.5 {
-                    actions.add(5, PlayerAction::Bark(self.motivation(), MotivatorKey::Hurt));
-                    actions.add(2, PlayerAction::BumpMotivator(MotivatorKey::Sadness));
+                    actions.add(5, ActorAction::Bark(self.motivation(), MotivatorKey::Hurt));
+                    actions.add(2, ActorAction::BumpMotivator(MotivatorKey::Sadness));
                 }
             }
             _ => {}
@@ -415,35 +415,35 @@ impl Signal for Hurt {
         // Can die regardless of focus
         // If fully "motivated" then die
         if self.motivation() >= 0.99 {
-            actions.add(1000, PlayerAction::Death);
+            actions.add(1000, ActorAction::Death);
         }
     }
 }
 
 impl Signal for Sickness {
-    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedPlayerActions) {
+    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         match ctx.focus {
-            PlayerFocus::Unfocused => {
+            ActorFocus::Unfocused => {
                 if self.motivation() > 0.0 {
                     // Its possible for it to randomly get worse or better
                     // slightly favouring getting better
-                    actions.add(8, PlayerAction::ReduceMotivator(MotivatorKey::Sickness));
-                    actions.add(5, PlayerAction::BumpMotivator(MotivatorKey::Sickness));
+                    actions.add(8, ActorAction::ReduceMotivator(MotivatorKey::Sickness));
+                    actions.add(5, ActorAction::BumpMotivator(MotivatorKey::Sickness));
                 }
 
                 if self.motivation() > 0.5 {
                     actions.add(
                         10,
-                        PlayerAction::Bark(self.motivation(), MotivatorKey::Sickness),
+                        ActorAction::Bark(self.motivation(), MotivatorKey::Sickness),
                     );
                 }
 
                 if self.motivation() > 0.8 {
                     actions.add(
                         10,
-                        PlayerAction::Bark(self.motivation(), MotivatorKey::Sickness),
+                        ActorAction::Bark(self.motivation(), MotivatorKey::Sickness),
                     );
-                    actions.add(10, PlayerAction::BumpMotivator(MotivatorKey::Hurt));
+                    actions.add(10, ActorAction::BumpMotivator(MotivatorKey::Hurt));
                 }
             }
             _ => {}
@@ -452,24 +452,24 @@ impl Signal for Sickness {
 }
 
 impl Signal for Tiredness {
-    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedPlayerActions) {
+    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         match ctx.focus {
-            PlayerFocus::Unfocused => {
+            ActorFocus::Unfocused => {
                 if self.motivation() > 0.7 {
                     actions.add(
                         10,
-                        PlayerAction::Bark(self.motivation(), MotivatorKey::Tiredness),
+                        ActorAction::Bark(self.motivation(), MotivatorKey::Tiredness),
                     );
                 }
 
                 if self.motivation() > 0.8 {
                     actions.add(
                         20,
-                        PlayerAction::Bark(self.motivation(), MotivatorKey::Tiredness),
+                        ActorAction::Bark(self.motivation(), MotivatorKey::Tiredness),
                     );
                     actions.add(
                         if self.motivation() > 0.95 { 50 } else { 10 },
-                        PlayerAction::Sleep,
+                        ActorAction::Sleep,
                     );
                 }
             }
@@ -480,28 +480,28 @@ impl Signal for Tiredness {
 
 // Is wet for whatever reason
 impl Signal for Saturation {
-    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedPlayerActions) {
+    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         match ctx.focus {
-            PlayerFocus::Unfocused => {
+            ActorFocus::Unfocused => {
                 if self.motivation() > 0.0 {
                     // Complain about being wet
                     actions.add(
                         15,
-                        PlayerAction::Bark(self.motivation(), MotivatorKey::Saturation),
+                        ActorAction::Bark(self.motivation(), MotivatorKey::Saturation),
                     );
 
                     // Just slowly become dry
-                    actions.add(5, PlayerAction::ReduceMotivator(MotivatorKey::Saturation));
+                    actions.add(5, ActorAction::ReduceMotivator(MotivatorKey::Saturation));
                 }
 
                 if self.motivation() > 0.1 {
                     // Get more cold
-                    actions.add(10, PlayerAction::BumpMotivator(MotivatorKey::Cold));
+                    actions.add(10, ActorAction::BumpMotivator(MotivatorKey::Cold));
 
                     // Maybe get sick
                     actions.add(
                         if self.motivation() > 0.5 { 10 } else { 20 },
-                        PlayerAction::BumpMotivator(MotivatorKey::Sickness),
+                        ActorAction::BumpMotivator(MotivatorKey::Sickness),
                     );
                 }
 
@@ -509,10 +509,10 @@ impl Signal for Saturation {
                 if self.motivation() > 0.1 && ctx.world_state.weather.is_raining() {
                     actions.add(
                         10,
-                        PlayerAction::Sequential(vec![
-                            PlayerAction::TakeShelter,
-                            PlayerAction::SeekKnownShelter,
-                            PlayerAction::Bark(self.motivation(), MotivatorKey::Saturation),
+                        ActorAction::Sequential(vec![
+                            ActorAction::TakeShelter,
+                            ActorAction::SeekKnownShelter,
+                            ActorAction::Bark(self.motivation(), MotivatorKey::Saturation),
                         ]),
                     );
                 }
@@ -523,19 +523,19 @@ impl Signal for Saturation {
 }
 
 impl Signal for Cold {
-    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedPlayerActions) {
+    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         match ctx.focus {
-            PlayerFocus::Unfocused => {
+            ActorFocus::Unfocused => {
                 // TODO: more intelligent plans like finding shelter etc
 
                 // If cold, go seek shelter
                 if self.motivation() > 0.4 {
                     actions.add(
                         10,
-                        PlayerAction::Sequential(vec![
-                            PlayerAction::TakeShelter,
-                            PlayerAction::SeekKnownShelter,
-                            PlayerAction::Bark(self.motivation(), MotivatorKey::Cold),
+                        ActorAction::Sequential(vec![
+                            ActorAction::TakeShelter,
+                            ActorAction::SeekKnownShelter,
+                            ActorAction::Bark(self.motivation(), MotivatorKey::Cold),
                         ]),
                     );
                 }
@@ -543,25 +543,25 @@ impl Signal for Cold {
                 // The cold just makes you tired for now
                 // and maybe sick?
                 if self.motivation() > 0.6 {
-                    actions.add(5, PlayerAction::BumpMotivator(MotivatorKey::Tiredness));
-                    actions.add(2, PlayerAction::BumpMotivator(MotivatorKey::Sickness));
-                    actions.add(2, PlayerAction::BumpMotivator(MotivatorKey::Sadness));
-                    actions.add(8, PlayerAction::Bark(self.motivation(), MotivatorKey::Cold));
+                    actions.add(5, ActorAction::BumpMotivator(MotivatorKey::Tiredness));
+                    actions.add(2, ActorAction::BumpMotivator(MotivatorKey::Sickness));
+                    actions.add(2, ActorAction::BumpMotivator(MotivatorKey::Sadness));
+                    actions.add(8, ActorAction::Bark(self.motivation(), MotivatorKey::Cold));
                 }
 
                 // and hurt in the absolute worst case
                 if self.motivation() > 0.95 {
-                    actions.add(5, PlayerAction::BumpMotivator(MotivatorKey::Hurt));
+                    actions.add(5, ActorAction::BumpMotivator(MotivatorKey::Hurt));
                 }
             }
-            PlayerFocus::Sleeping { .. } => {
+            ActorFocus::Sleeping { .. } => {
                 // Hard to sleep if its cold
                 if self.motivation() > 0.7 {
                     actions.add(
                         5,
-                        PlayerAction::Sequential(seq![
-                            PlayerAction::Bark(self.motivation(), MotivatorKey::Cold),
-                            PlayerAction::WakeUp,
+                        ActorAction::Sequential(seq![
+                            ActorAction::Bark(self.motivation(), MotivatorKey::Cold),
+                            ActorAction::WakeUp,
                         ]),
                     );
                 }
@@ -572,15 +572,15 @@ impl Signal for Cold {
 }
 
 impl Signal for Sadness {
-    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedPlayerActions) {
+    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         match ctx.focus {
-            PlayerFocus::Unfocused => {
+            ActorFocus::Unfocused => {
                 if self.motivation() > 0.0 {
                     actions.add(
                         5,
-                        PlayerAction::Bark(self.motivation(), MotivatorKey::Sadness),
+                        ActorAction::Bark(self.motivation(), MotivatorKey::Sadness),
                     );
-                    actions.add(5, PlayerAction::ReduceMotivator(MotivatorKey::Sadness));
+                    actions.add(5, ActorAction::ReduceMotivator(MotivatorKey::Sadness));
                 }
             }
             _ => {}

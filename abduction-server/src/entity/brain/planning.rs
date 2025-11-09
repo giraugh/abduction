@@ -2,9 +2,9 @@ use itertools::Itertools;
 
 use crate::entity::{
     brain::{
+        actor_action::ActorAction,
         characteristic::Characteristic,
-        player_action::PlayerAction,
-        signal::{Signal, SignalContext, SignalRef, WeightedPlayerActions},
+        signal::{Signal, SignalContext, SignalRef, WeightedActorActions},
     },
     Entity,
 };
@@ -25,7 +25,7 @@ pub enum PlanningSignal {
 
 impl Signal for PlanningSignal {
     // NOTE: all of these use low weights, as they are not immediately important
-    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedPlayerActions) {
+    fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         // We need a location for these to make sense
         let Some(hex) = ctx.entity.attributes.hex else {
             return;
@@ -50,7 +50,7 @@ impl Signal for PlanningSignal {
                         continue;
                     }
 
-                    actions.add(2, PlayerAction::PickUpEntity(food_entity.entity_id.clone()));
+                    actions.add(2, ActorAction::PickUpEntity(food_entity.entity_id.clone()));
                     break;
                 }
             }

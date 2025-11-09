@@ -1,10 +1,10 @@
+pub mod actor_action;
 pub mod characteristic;
 pub mod discussion;
 pub mod focus;
 pub mod meme;
 pub mod motivator;
 pub mod planning;
-pub mod player_action;
 pub mod signal;
 
 use itertools::Itertools;
@@ -14,10 +14,10 @@ use tracing::warn;
 use crate::{
     entity::{
         brain::{
+            actor_action::{ActorAction, ActorActionResult, ActorActionSideEffect},
             characteristic::{Characteristic, CharacteristicStrength},
             motivator::Sadness,
-            player_action::{PlayerAction, PlayerActionResult, PlayerActionSideEffect},
-            signal::{Signal, SignalContext, SignalRef, WeightedPlayerActions},
+            signal::{Signal, SignalContext, SignalRef, WeightedActorActions},
         },
         Entity, EntityFood, EntityWaterSource,
     },
@@ -27,7 +27,7 @@ use crate::{
     logs::{AsEntityId, GameLog, GameLogBody},
     mtch::ActionCtx,
 };
-use focus::PlayerFocus;
+use focus::ActorFocus;
 
 impl Entity {
     /// Determine the next action to be taken by an entity
@@ -36,14 +36,14 @@ impl Entity {
         &'a self,
         ctx: &ActionCtx,
         event_signals: impl Iterator<Item = SignalRef<'a>>,
-    ) -> PlayerAction {
+    ) -> ActorAction {
         // Build the context for acting (WIP)
         let current_focus = self
             .attributes
             .focus
             .as_ref()
             .cloned()
-            .unwrap_or(PlayerFocus::Unfocused);
+            .unwrap_or(ActorFocus::Unfocused);
         let signal_ctx = SignalContext {
             entities: ctx.entities,
             entity: self,
@@ -65,28 +65,28 @@ impl Entity {
         );
 
         // Then resolve them into actions
-        let mut actions = WeightedPlayerActions::default();
+        let mut actions = WeightedActorActions::default();
         signals.for_each(|signal| signal.act_on(&signal_ctx, &mut actions));
         actions.sample(&mut rand::rng())
     }
 
     pub fn resolve_action(
         &mut self,
-        action: PlayerAction,
+        action: ActorAction,
         ctx: &mut ActionCtx,
-    ) -> PlayerActionResult {
+    ) -> ActorActionResult {
         // Must have a hex to take actions
         let Some(my_hex) = self.attributes.hex else {
-            return PlayerActionResult::NoEffect;
+            return ActorActionResult::NoEffect;
         };
 
         match &action {
-            PlayerAction::Nothing => {
-                return PlayerActionResult::NoEffect;
+            ActorAction::Nothing => {
+                return ActorActionResult::NoEffect;
             }
 
             // Just send a log
-            PlayerAction::Log { other, body } => {
+            ActorAction::Log { other, body } => {
                 match other {
                     Some(other) => {
                         ctx.send_log(GameLog::entity_pair(self, other, body.clone()));
@@ -96,42 +96,42 @@ impl Entity {
                     }
                 }
 
-                return PlayerActionResult::NoEffect;
+                return ActorActionResult::NoEffect;
             }
 
-            PlayerAction::Sequential(sub_actions) => {
+            ActorAction::Sequential(sub_actions) => {
                 for sub_action in sub_actions {
                     match self.resolve_action(sub_action.clone(), ctx) {
-                        PlayerActionResult::SideEffect(side_effect) => {
-                            return PlayerActionResult::SideEffect(side_effect)
+                        ActorActionResult::SideEffect(side_effect) => {
+                            return ActorActionResult::SideEffect(side_effect)
                         }
-                        PlayerActionResult::NoEffect => {
+                        ActorActionResult::NoEffect => {
                             continue;
                         }
-                        PlayerActionResult::Ok => {
+                        ActorActionResult::Ok => {
                             break;
                         }
                     }
                 }
 
-                return PlayerActionResult::NoEffect;
+                return ActorActionResult::NoEffect;
             }
 
-            PlayerAction::PickUpEntity(entity_id) => {
+            ActorAction::PickUpEntity(entity_id) => {
                 // Find that item, it must be an `item` (have an item field)
                 let Some(item_entity) = ctx.entities.by_id(entity_id) else {
                     warn!("Cannot pick up non-existent entity");
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 };
                 let Some(item) = &item_entity.attributes.item else {
                     warn!("Cannot pick up non-item");
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 };
 
                 // Do we have room?
                 let avail_space = self.available_inventory_load(ctx.entities);
                 if item.heft > avail_space {
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 }
 
                 // Log the pickup action
@@ -144,51 +144,51 @@ impl Entity {
                 // Add to our inventory
                 // and banish it from the world (so others cant pick it up too etc)
                 self.relations.inventory_mut().insert(entity_id.clone());
-                return PlayerActionResult::SideEffect(PlayerActionSideEffect::BanishOther(
+                return ActorActionResult::SideEffect(ActorActionSideEffect::BanishOther(
                     entity_id.clone(),
                 ));
             }
 
-            PlayerAction::BumpMotivator(key) => {
+            ActorAction::BumpMotivator(key) => {
                 self.attributes.motivators.bump_key(*key);
-                return PlayerActionResult::Ok;
+                return ActorActionResult::Ok;
             }
 
-            PlayerAction::ReduceMotivator(key) => {
+            ActorAction::ReduceMotivator(key) => {
                 self.attributes.motivators.reduce_key(*key);
-                return PlayerActionResult::Ok;
+                return ActorActionResult::Ok;
             }
 
-            PlayerAction::Discussion(discussion_action) => {
+            ActorAction::Discussion(discussion_action) => {
                 return self.resolve_discussion_action(discussion_action, ctx)
             }
 
-            PlayerAction::WakeUp => {
+            ActorAction::WakeUp => {
                 match self.attributes.focus {
                     // If we are alreay sleeping, keep sleeping
-                    Some(PlayerFocus::Sleeping { .. }) => {
-                        self.attributes.focus = Some(PlayerFocus::Unfocused);
+                    Some(ActorFocus::Sleeping { .. }) => {
+                        self.attributes.focus = Some(ActorFocus::Unfocused);
 
                         // Its very beneficial!
                         self.attributes.motivators.reduce_by::<motivator::Hurt>(0.2);
 
                         ctx.send_log(GameLog::entity(self, GameLogBody::EntityStopSleeping));
                     }
-                    _ => return PlayerActionResult::NoEffect,
+                    _ => return ActorActionResult::NoEffect,
                 }
 
-                return PlayerActionResult::Ok;
+                return ActorActionResult::Ok;
             }
 
-            PlayerAction::Sleep => {
+            ActorAction::Sleep => {
                 match self.attributes.focus {
                     // If we are alreay sleeping, keep sleeping
-                    Some(PlayerFocus::Sleeping {
+                    Some(ActorFocus::Sleeping {
                         ref mut remaining_turns,
                     }) => {
                         // Wake up?
                         if *remaining_turns <= 1 {
-                            self.attributes.focus = Some(PlayerFocus::Unfocused);
+                            self.attributes.focus = Some(ActorFocus::Unfocused);
 
                             // Its very beneficial!
                             self.attributes.motivators.reduce_by::<motivator::Hurt>(0.2);
@@ -209,7 +209,7 @@ impl Entity {
 
                     // Otherwise, start sleeping now
                     _ => {
-                        self.attributes.focus = Some(PlayerFocus::Sleeping {
+                        self.attributes.focus = Some(ActorFocus::Sleeping {
                             remaining_turns: 25,
                         });
 
@@ -217,11 +217,11 @@ impl Entity {
                     }
                 };
 
-                return PlayerActionResult::Ok;
+                return ActorActionResult::Ok;
             }
 
             // Literally die
-            PlayerAction::Death => {
+            ActorAction::Death => {
                 ctx.send_log(GameLog::entity(self, GameLogBody::EntityDeath));
 
                 // Raise event
@@ -233,10 +233,10 @@ impl Entity {
                     .targets_hex_of(self)
                     .add(ctx);
 
-                return PlayerActionResult::SideEffect(PlayerActionSideEffect::Death);
+                return ActorActionResult::SideEffect(ActorActionSideEffect::Death);
             }
 
-            PlayerAction::MoveAwayFrom(log_body, markers) => {
+            ActorAction::MoveAwayFrom(log_body, markers) => {
                 let mut rng = rand::rng();
 
                 // Get entities at my location with that marker
@@ -249,21 +249,21 @@ impl Entity {
 
                 // Is there at least one? If so choose one at random
                 let Some(avoid_entity) = avoid_entities.choose(&mut rng) else {
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 };
 
                 // Emit log
                 ctx.send_log(GameLog::entity_pair(self, *avoid_entity, log_body.clone()));
 
                 // Then move randomly
-                let move_action = PlayerAction::all_movements()
+                let move_action = ActorAction::all_movements()
                     .choose(&mut rng)
                     .unwrap()
                     .clone();
                 return self.resolve_action(move_action, ctx);
             }
 
-            PlayerAction::GoToAdjacent(log_body, markers) => {
+            ActorAction::GoToAdjacent(log_body, markers) => {
                 let mut rng = rand::rng();
 
                 // Is the current hex such a hex?
@@ -273,7 +273,7 @@ impl Entity {
                     .any(|e| markers.iter().any(|m| e.markers.contains(m)));
 
                 if current_hex_valid {
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 }
 
                 // If not, pull all applicable adjacent entities
@@ -285,7 +285,7 @@ impl Entity {
 
                 // If no relevant adjacent hexs, we cant do anything
                 if adj_entities.is_empty() {
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 }
 
                 // But if there is, choose one at random
@@ -298,12 +298,12 @@ impl Entity {
                 ctx.send_log(GameLog::entity(self, log_body.clone()));
 
                 // Travel towards that hex
-                return self.resolve_action(PlayerAction::Move(direction), ctx);
+                return self.resolve_action(ActorAction::Move(direction), ctx);
             }
 
             // This is a little tricky lets be honest
             // I think I would just do easiest possible approach and move to the neighbour hex which reduces the distance the most
-            PlayerAction::GoTowards(log_body, markers) => {
+            ActorAction::GoTowards(log_body, markers) => {
                 // Is the current hex such a hex?
                 let current_hex_valid = ctx
                     .entities
@@ -311,7 +311,7 @@ impl Entity {
                     .any(|e| markers.iter().any(|m| e.markers.contains(m)));
 
                 if current_hex_valid {
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 }
 
                 // If not, pull all applicable entities
@@ -323,7 +323,7 @@ impl Entity {
 
                 // If no relevant entities, we cant do anything
                 if target_entities.is_empty() {
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 }
 
                 // Emit log
@@ -336,13 +336,13 @@ impl Entity {
                     .unwrap();
                 let target_hex = target_entity.attributes.hex.unwrap();
 
-                return self.resolve_action(PlayerAction::GoTowardsHex(target_hex), ctx);
+                return self.resolve_action(ActorAction::GoTowardsHex(target_hex), ctx);
             }
 
-            PlayerAction::GoTowardsHex(target_hex) => {
+            ActorAction::GoTowardsHex(target_hex) => {
                 // Already there?
                 if *target_hex == my_hex {
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 }
 
                 // Find our adjacent hex which is closest to the target hex
@@ -355,11 +355,11 @@ impl Entity {
 
                 // And travel towards that
                 let direction = AxialHexDirection::direction_to(my_hex, adjacent_hex).unwrap();
-                return self.resolve_action(PlayerAction::Move(direction), ctx);
+                return self.resolve_action(ActorAction::Move(direction), ctx);
             }
 
             // Indicating a high motivator value
-            PlayerAction::Bark(motivation, motivator) => {
+            ActorAction::Bark(motivation, motivator) => {
                 ctx.send_log(GameLog::entity(
                     self,
                     GameLogBody::EntityMotivatorBark {
@@ -369,10 +369,10 @@ impl Entity {
                 ));
 
                 // This returns no effect so that the boredom is increased and to allow stacking barks + other actions w/ Sequential
-                return PlayerActionResult::NoEffect;
+                return ActorActionResult::NoEffect;
             }
 
-            PlayerAction::ConsumeFoodEntity(food_entity_id) => {
+            ActorAction::ConsumeFoodEntity(food_entity_id) => {
                 // Get that entity
                 let food_entity = ctx.entities.by_id(food_entity_id).unwrap();
 
@@ -413,33 +413,33 @@ impl Entity {
                 }
 
                 // Return side effect to remove the food
-                return PlayerActionResult::SideEffect(PlayerActionSideEffect::RemoveOther(
+                return ActorActionResult::SideEffect(ActorActionSideEffect::RemoveOther(
                     food_entity.entity_id.clone(),
                 ));
             }
 
-            PlayerAction::RetrieveInventoryFood => {
+            ActorAction::RetrieveInventoryFood => {
                 let Some(food_entity) = self
                     .resolve_inventory(ctx.entities)
                     .find(|e| e.attributes.food.is_some())
                 else {
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 };
 
                 return self.resolve_action(
-                    PlayerAction::RetrieveEntity(food_entity.entity_id.clone()),
+                    ActorAction::RetrieveEntity(food_entity.entity_id.clone()),
                     ctx,
                 );
             }
 
-            PlayerAction::RetrieveEntity(entity_id) => {
+            ActorAction::RetrieveEntity(entity_id) => {
                 // Remove from inventory ids
                 self.relations.inventory_mut().remove(entity_id);
 
                 // Get the item entity
                 let Some(item_entity) = ctx.entities.by_id(entity_id) else {
                     warn!("Attempted to retrieve non existent entity from inventory");
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 };
 
                 // Log that we got it out
@@ -450,13 +450,13 @@ impl Entity {
                 ));
 
                 // Unbanish it
-                return PlayerActionResult::SideEffect(PlayerActionSideEffect::UnbanishOther(
+                return ActorActionResult::SideEffect(ActorActionSideEffect::UnbanishOther(
                     item_entity.entity_id.clone(),
                     my_hex,
                 ));
             }
 
-            PlayerAction::ConsumeNearbyFood {
+            ActorAction::ConsumeNearbyFood {
                 try_dubious,
                 try_morally_wrong,
             } => {
@@ -482,17 +482,17 @@ impl Entity {
                             Some(EntityFood { .. }) => true,
                         });
                 let Some(food_entity) = food_entities.choose(&mut rng) else {
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 };
 
                 return self.resolve_action(
-                    PlayerAction::ConsumeFoodEntity(food_entity.entity_id.clone()),
+                    ActorAction::ConsumeFoodEntity(food_entity.entity_id.clone()),
                     ctx,
                 );
             }
 
             // NOTE: entity may not exist at this point
-            PlayerAction::MournEntity { entity_id } => {
+            ActorAction::MournEntity { entity_id } => {
                 // Get sad
                 self.attributes.motivators.bump::<Sadness>();
 
@@ -514,7 +514,7 @@ impl Entity {
                 }
             }
 
-            PlayerAction::DrinkFromWaterSource { try_dubious } => {
+            ActorAction::DrinkFromWaterSource { try_dubious } => {
                 // Is there food at this location?
                 let mut rng = rand::rng();
                 let water_source_entities = ctx
@@ -534,7 +534,7 @@ impl Entity {
 
                 // If no applicable water source, there's no effect
                 let Some(water_source_entity) = water_source_entities.choose(&mut rng) else {
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 };
 
                 // if there is, drink from it
@@ -578,10 +578,10 @@ impl Entity {
                     ));
                 }
 
-                return PlayerActionResult::Ok;
+                return ActorActionResult::Ok;
             }
 
-            PlayerAction::GreetEntity { entity_id } => {
+            ActorAction::GreetEntity { entity_id } => {
                 let entity = ctx.entities.by_id(entity_id).unwrap();
 
                 // Is there an established association relation?
@@ -635,15 +635,15 @@ impl Entity {
                         ));
 
                         // Set our focus
-                        self.attributes.focus = Some(PlayerFocus::Discussion {
+                        self.attributes.focus = Some(ActorFocus::Discussion {
                             with: entity_id.clone(),
                             interest,
                         });
 
                         // TODO: maybe there's a strat here where we force them to do a "talk" action w/ us instead
-                        return PlayerActionResult::SideEffect(PlayerActionSideEffect::SetFocus {
+                        return ActorActionResult::SideEffect(ActorActionSideEffect::SetFocus {
                             entity_id: entity_id.clone(),
-                            focus: PlayerFocus::Discussion {
+                            focus: ActorFocus::Discussion {
                                 with: self.entity_id.clone(),
                                 interest,
                             },
@@ -652,18 +652,18 @@ impl Entity {
                 }
             }
 
-            PlayerAction::TakeShelter => {
+            ActorAction::TakeShelter => {
                 // Is there shelter at my location?
                 let Some(shelter_entity) = ctx
                     .entities
                     .in_hex(my_hex)
                     .find(|e| has_markers!(e, Shelter))
                 else {
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 };
 
                 // Shelter in that thang
-                self.attributes.focus = Some(PlayerFocus::Sheltering {
+                self.attributes.focus = Some(ActorFocus::Sheltering {
                     shelter_entity_id: shelter_entity.entity_id.clone(),
                 });
 
@@ -679,20 +679,20 @@ impl Entity {
                     shelter_entity.attributes.hex.unwrap(),
                 ));
 
-                return PlayerActionResult::Ok;
+                return ActorActionResult::Ok;
             }
 
-            PlayerAction::LeaveShelter => {
+            ActorAction::LeaveShelter => {
                 // Check we are in shelter
-                let Some(PlayerFocus::Sheltering { shelter_entity_id }) =
+                let Some(ActorFocus::Sheltering { shelter_entity_id }) =
                     self.attributes.focus.clone()
                 else {
                     warn!("Tried to leave shelter but not in shelter");
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 };
 
                 // Then leave shelter
-                self.attributes.focus = Some(PlayerFocus::Unfocused);
+                self.attributes.focus = Some(ActorFocus::Unfocused);
 
                 // and log that
                 ctx.send_log(GameLog::entity_pair(
@@ -701,10 +701,10 @@ impl Entity {
                     GameLogBody::EntityLeaveShelter,
                 ));
 
-                return PlayerActionResult::Ok;
+                return ActorActionResult::Ok;
             }
 
-            PlayerAction::SeekKnownWaterSource => {
+            ActorAction::SeekKnownWaterSource => {
                 // The only way we have to do this is to use shelter memes
                 let Some(water_source_loc) = self
                     .memes_mut()
@@ -712,14 +712,14 @@ impl Entity {
                     .min_by_key(|l| l.dist_to(my_hex))
                 else {
                     // we dont know of any
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 };
 
                 // Go towards that
-                return self.resolve_action(PlayerAction::GoTowardsHex(water_source_loc), ctx);
+                return self.resolve_action(ActorAction::GoTowardsHex(water_source_loc), ctx);
             }
 
-            PlayerAction::SeekKnownShelter => {
+            ActorAction::SeekKnownShelter => {
                 // The only way we have to do this is to use shelter memes
                 let Some(shelter_loc) = self
                     .memes_mut()
@@ -727,15 +727,15 @@ impl Entity {
                     .min_by_key(|l| l.dist_to(my_hex))
                 else {
                     // we dont know of any
-                    return PlayerActionResult::NoEffect;
+                    return ActorActionResult::NoEffect;
                 };
 
                 // Go towards that
-                return self.resolve_action(PlayerAction::GoTowardsHex(shelter_loc), ctx);
+                return self.resolve_action(ActorAction::GoTowardsHex(shelter_loc), ctx);
             }
 
             // Moving in a given hex direction
-            PlayerAction::Move(hex_direction) => {
+            ActorAction::Move(hex_direction) => {
                 let hex = self
                     .attributes
                     .hex
@@ -778,6 +778,6 @@ impl Entity {
             }
         }
 
-        PlayerActionResult::Ok
+        ActorActionResult::Ok
     }
 }

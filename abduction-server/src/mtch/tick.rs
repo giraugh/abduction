@@ -1,18 +1,19 @@
 use itertools::Itertools;
 use rand::{seq::IndexedRandom, Rng};
+use tracing::warn;
 
 use crate::{
     create_markers,
     entity::{
         brain::{
-            focus::PlayerFocus,
+            actor_action::{ActorAction, ActorActionSideEffect},
+            focus::ActorFocus,
             motivator,
-            player_action::{PlayerActionResult, PlayerActionSideEffect},
         },
         gen::generate_corpse,
         snapshot::{EntitySnapshot, EntityView},
         world::{EntityWorld, TimeOfDay, WeatherKind},
-        Entity, EntityAttributes, EntityHazard,
+        Entity, EntityAttributes, EntityHazard, EntityManager,
     },
     has_markers,
     hex::AxialHex,
@@ -57,12 +58,54 @@ impl MatchManager {
             events_buffer: &mut events_buffer,
         };
 
+        // Before any players act, the presenter/collector get to act
+        if let Some(presenter_entity) = entities_view
+            .all()
+            .find(|e| e.attributes.presenter.is_some())
+        {
+            let mut rng = rand::rng();
+            let events = action_ctx
+                .events
+                .get_event_signals_for_entity(presenter_entity);
+            let action = presenter_entity.get_next_action_as_presenter(&action_ctx, events);
+            Self::resolve_actor_action(
+                &mut action_ctx,
+                &mut self.entities,
+                &mut rng,
+                presenter_entity.clone(),
+                action,
+            );
+        } else {
+            warn!("No presenter.. uhh is present");
+        };
+
+        if let Some(collector_entity) = entities_view
+            .all()
+            .find(|e| e.attributes.collector.is_some())
+        {
+            let mut rng = rand::rng();
+            let events = action_ctx
+                .events
+                .get_event_signals_for_entity(collector_entity);
+            let action = collector_entity.get_next_action_as_collector(&action_ctx, events);
+            Self::resolve_actor_action(
+                &mut action_ctx,
+                &mut self.entities,
+                &mut rng,
+                collector_entity.clone(),
+                action,
+            );
+        } else {
+            warn!("No collector is present");
+        };
+
         // Lets just attempt to implement the main entity loop and see how we go I guess?
         // Rough plan is that each hex has one player action - the player who acted last acts now
         // This is encoded as the player with the highest `TicksWaited` attribute
         let players_in_hexes = entities_view
             .all()
-            .filter(|e| has_markers!(e, Player))
+            // cannot act if no hex
+            .filter(|e| has_markers!(e, Player) && e.attributes.hex.is_some())
             .cloned()
             .into_group_map_by(|e| e.attributes.hex.unwrap());
         for (_hex, players) in players_in_hexes {
@@ -82,55 +125,22 @@ impl MatchManager {
                 if let Some(entity) = players.choose(&mut rng) {
                     // Get a new copy to preserve changes from above
                     // Skipping this step if they were removed
-                    let Some(mut player) = self.entities.get_entity(&entity.entity_id) else {
+                    let Some(player) = self.entities.get_entity(&entity.entity_id) else {
                         continue;
                     };
 
+                    // What are they going to do?
+                    let events = action_ctx.events.get_event_signals_for_entity(&player);
+                    let action = player.get_next_action(&action_ctx, events);
+
                     // Go update it
-                    match self.resolve_player_action(&mut player, &mut action_ctx) {
-                        Some(PlayerActionSideEffect::Death) => {
-                            // Remove this player entity
-                            self.entities.remove_entity(&player.entity_id).unwrap();
-
-                            // Add a corpse
-                            self.entities
-                                .upsert_entity(generate_corpse(&mut rng, player))
-                                .unwrap();
-                        }
-                        Some(PlayerActionSideEffect::RemoveOther(entity_id)) => {
-                            self.entities.remove_entity(&entity_id).unwrap();
-                            self.entities.upsert_entity(player).unwrap();
-                        }
-                        Some(PlayerActionSideEffect::BanishOther(entity_id)) => {
-                            // Remove the target entities hex
-                            let mut entity_to_banish =
-                                self.entities.get_entity(&entity_id).unwrap();
-                            entity_to_banish.attributes.hex = None;
-
-                            // Then update it, then update us as normal
-                            self.entities.upsert_entity(entity_to_banish).unwrap();
-                            self.entities.upsert_entity(player).unwrap();
-                        }
-                        Some(PlayerActionSideEffect::UnbanishOther(entity_id, hex)) => {
-                            // Set the target entities hex
-                            let mut entity_to_banish =
-                                self.entities.get_entity(&entity_id).unwrap();
-                            entity_to_banish.attributes.hex = Some(hex);
-
-                            // Then update it, then update us as normal
-                            self.entities.upsert_entity(entity_to_banish).unwrap();
-                            self.entities.upsert_entity(player).unwrap();
-                        }
-                        Some(PlayerActionSideEffect::SetFocus { entity_id, focus }) => {
-                            let mut other_entity = self.entities.get_entity(&entity_id).unwrap();
-                            other_entity.attributes.focus = Some(focus);
-                            self.entities.upsert_entity(other_entity).unwrap();
-                            self.entities.upsert_entity(player).unwrap();
-                        }
-                        None => {
-                            self.entities.upsert_entity(player).unwrap();
-                        }
-                    }
+                    Self::resolve_actor_action(
+                        &mut action_ctx,
+                        &mut self.entities,
+                        &mut rng,
+                        player,
+                        action,
+                    );
                 }
             }
         }
@@ -203,11 +213,8 @@ impl MatchManager {
 
         // Are they sheltering?
         // if so, some of the world stops acting on them
-        let unfocused = matches!(player.attributes.focus, None | Some(PlayerFocus::Unfocused));
-        let sheltering = matches!(
-            player.attributes.focus,
-            Some(PlayerFocus::Sheltering { .. })
-        );
+        let unfocused = matches!(player.attributes.focus, None | Some(ActorFocus::Unfocused));
+        let sheltering = matches!(player.attributes.focus, Some(ActorFocus::Sheltering { .. }));
 
         // Is there a `hazard` entity at their hex?
         if player.attributes.hex.is_some() && rng.random_bool(0.7) && unfocused {
@@ -341,27 +348,68 @@ impl MatchManager {
         }
     }
 
-    fn resolve_player_action(
-        &self,
-        player: &mut Entity,
-        ctx: &mut ActionCtx,
-    ) -> Option<PlayerActionSideEffect> {
-        let events = ctx.events.get_event_signals_for_entity(player);
-        let action = player.get_next_action(ctx, events);
-        let result = player.resolve_action(action, ctx);
+    fn resolve_action_side_effect(
+        entities: &mut EntityManager,
+        rng: &mut impl rand::Rng,
+        entity: Entity,
+        side_effect: Option<ActorActionSideEffect>,
+    ) {
+        match side_effect {
+            Some(ActorActionSideEffect::Death) => {
+                // Remove this player entity
+                entities.remove_entity(&entity.entity_id).unwrap();
 
-        // TODO: perhaps if the resolved action had no effect, I could let them try again N times?
+                // Add a corpse
+                entities
+                    .upsert_entity(generate_corpse(rng, entity))
+                    .unwrap();
+            }
+            Some(ActorActionSideEffect::RemoveOther(entity_id)) => {
+                entities.remove_entity(&entity_id).unwrap();
+                entities.upsert_entity(entity).unwrap();
+            }
+            Some(ActorActionSideEffect::BanishOther(entity_id)) => {
+                // Remove the target entities hex
+                let mut entity_to_banish = entities.get_entity(&entity_id).unwrap();
+                entity_to_banish.attributes.hex = None;
 
-        // If the last thing they did had no result, they get bored
-        if matches!(result, PlayerActionResult::NoEffect) {
-            player
-                .attributes
-                .motivators
-                .bump_scaled::<motivator::Boredom>(2.0); // mostly temp for dev
-        } else {
-            player.attributes.motivators.clear::<motivator::Boredom>();
+                // Then update it, then update us as normal
+                entities.upsert_entity(entity_to_banish).unwrap();
+                entities.upsert_entity(entity).unwrap();
+            }
+            Some(ActorActionSideEffect::UnbanishOther(entity_id, hex)) => {
+                // Set the target entities hex
+                let mut entity_to_banish = entities.get_entity(&entity_id).unwrap();
+                entity_to_banish.attributes.hex = Some(hex);
+
+                // Then update it, then update us as normal
+                entities.upsert_entity(entity_to_banish).unwrap();
+                entities.upsert_entity(entity).unwrap();
+            }
+            Some(ActorActionSideEffect::SetFocus { entity_id, focus }) => {
+                let mut other_entity = entities.get_entity(&entity_id).unwrap();
+                other_entity.attributes.focus = Some(focus);
+                entities.upsert_entity(other_entity).unwrap();
+                entities.upsert_entity(entity).unwrap();
+            }
+            None => {
+                entities.upsert_entity(entity).unwrap();
+            }
         }
+    }
 
-        result.side_effect()
+    fn resolve_actor_action(
+        ctx: &mut ActionCtx,
+        entities: &mut EntityManager,
+        rng: &mut impl rand::Rng,
+        mut entity: Entity,
+        action: ActorAction,
+    ) {
+        let result = entity.resolve_action(action, ctx);
+        let side_effect = result.side_effect();
+
+        // TODO: boredom bit used to be here but ehh, not sure if we want that anyway
+
+        Self::resolve_action_side_effect(entities, rng, entity, side_effect);
     }
 }

@@ -13,6 +13,7 @@
 /// - The match will then be scheduled but not run until the Monday.
 /// - Add queries and UI such that players can see the next upcoming match.
 pub mod config;
+pub mod presenter;
 pub mod tick;
 
 use anyhow::Context;
@@ -32,6 +33,7 @@ use crate::{
     has_markers,
     location::{generate_locations_for_world, Biome},
     logs::GameLog,
+    mtch::presenter::{generate_collector, generate_presenter},
     Db, ServerCtx,
 };
 
@@ -111,7 +113,12 @@ impl MatchManager {
         // then generate and add more
         let player_count_to_gen = self.config.player_count - existing_players;
         for _ in 0..player_count_to_gen {
-            let player_entity = generate_player().context("Generating player entity")?;
+            let mut player_entity = generate_player().context("Generating player entity")?;
+
+            // Remove the player hex so they are effectively "banished" until we "warp them in"
+            player_entity.attributes.hex = None;
+
+            // And add them
             self.entities.upsert_entity(player_entity)?;
         }
 
@@ -157,8 +164,9 @@ impl MatchManager {
             ..Default::default()
         })?;
 
-        // Put players in the desired locations
-        // TODO
+        // Add the presenter and co-host
+        self.entities.upsert_entity(generate_presenter())?;
+        self.entities.upsert_entity(generate_collector())?;
 
         Ok(())
     }
