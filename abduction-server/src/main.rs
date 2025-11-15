@@ -14,6 +14,7 @@ use std::sync::atomic;
 use std::{env, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::fs;
 use tokio::sync::broadcast;
+use tokio::sync::broadcast::error::RecvError;
 use tokio::time::{sleep, Duration};
 use tokio::{net::TcpListener, sync::Mutex};
 use tokio_util::sync::CancellationToken;
@@ -147,10 +148,10 @@ async fn main() {
     sqlx::migrate!().run(&db).await.unwrap();
 
     // Create channel for tick events
-    let (tick_tx, mut tick_rx) = broadcast::channel::<TickEvent>(10);
+    let (tick_tx, mut tick_rx) = broadcast::channel::<TickEvent>(20);
 
     // Create channel for game logs
-    let (log_tx, mut log_rx) = broadcast::channel::<GameLog>(10);
+    let (log_tx, mut log_rx) = broadcast::channel::<GameLog>(20);
 
     // Create a spot that could later be a match manager (youll see)
     let match_manager = Arc::default();
@@ -179,8 +180,18 @@ async fn main() {
     tracker.spawn({
         let token = token.clone();
         let start_loop = async move {
-            while let Ok(ev) = tick_rx.recv().await {
-                debug!("tick event {ev:?}");
+            loop {
+                match tick_rx.recv().await {
+                    Ok(ev) => debug!("tick event {ev:?}"),
+                    Err(err) => match err {
+                        RecvError::Closed => {
+                            break;
+                        }
+                        RecvError::Lagged(_) => {
+                            continue;
+                        }
+                    },
+                }
             }
         };
 
@@ -196,8 +207,18 @@ async fn main() {
     tracker.spawn({
         let token = token.clone();
         let start_loop = async move {
-            while let Ok(ev) = log_rx.recv().await {
-                debug!("{ev:?}");
+            loop {
+                match log_rx.recv().await {
+                    Ok(ev) => debug!({ "{ev:?}" }),
+                    Err(err) => match err {
+                        RecvError::Closed => {
+                            break;
+                        }
+                        RecvError::Lagged(_) => {
+                            continue;
+                        }
+                    },
+                }
             }
         };
 

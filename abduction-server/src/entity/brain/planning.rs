@@ -19,7 +19,8 @@ pub enum PlanningSignal {
     // WaterAccess,
 
     // Do we have shelter available to us?
-    // (NOT REALLY A THING YET)
+    // - Do we know of some?
+    // - We should try and find/make some
     // Shelter,
 }
 

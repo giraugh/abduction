@@ -120,7 +120,7 @@ pub enum ActorAction {
     WarpInEntity(EntityId),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum ActorActionResult {
     /// Something that happens to the world as a result of an actor action
     SideEffect(ActorActionSideEffect),

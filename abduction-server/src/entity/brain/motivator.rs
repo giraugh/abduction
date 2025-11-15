@@ -526,8 +526,6 @@ impl Signal for Cold {
     fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         match ctx.focus {
             ActorFocus::Unfocused => {
-                // TODO: more intelligent plans like finding shelter etc
-
                 // If cold, go seek shelter
                 if self.motivation() > 0.4 {
                     actions.add(

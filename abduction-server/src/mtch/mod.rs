@@ -61,7 +61,12 @@ pub struct ActionCtx<'a> {
 
 impl ActionCtx<'_> {
     pub fn send_log(&self, log: GameLog) {
-        self.log_tx.send(log).unwrap();
+        match self.log_tx.send(log) {
+            Ok(_) => {}
+            Err(err) => {
+                tracing::error!("Failed to send game log: {err}")
+            }
+        }
     }
 
     pub fn add_event(&mut self, event: GameEvent) {
