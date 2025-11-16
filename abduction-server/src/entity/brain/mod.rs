@@ -635,6 +635,7 @@ impl Entity {
                         // Set our focus
                         self.attributes.focus = Some(ActorFocus::Discussion {
                             with: entity_id.clone(),
+                            is_lead: true,
                             interest,
                         });
 
@@ -643,6 +644,7 @@ impl Entity {
                             entity_id: entity_id.clone(),
                             focus: ActorFocus::Discussion {
                                 with: self.entity_id.clone(),
+                                is_lead: false,
                                 interest,
                             },
                         });

@@ -8,7 +8,10 @@ use rand::seq::IndexedRandom;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-use crate::{entity::EntityId, hex::AxialHex};
+use crate::{
+    entity::{brain::discussion::DiscussionLeadAction, EntityId},
+    hex::AxialHex,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum Danger {
@@ -42,6 +45,12 @@ pub enum Meme {
     /// (NOTE: only added for safe water sources)
     #[strum(to_string = "water_source_at:{0}")]
     WaterSourceAt(AxialHex),
+
+    /// We remember all the discussion actions we've done with a given interlocutor
+    /// so that we dont repeat them
+    /// (not shareable)
+    #[strum(to_string = "asked:{0},{1}")]
+    Asked(EntityId, DiscussionLeadAction),
 }
 
 impl FromStr for Meme {
@@ -82,6 +91,10 @@ impl MemeTable {
 
     pub fn remember_is_dangerous(&mut self, entity_id: &EntityId) {
         self.insert(Meme::EntityIsDangerous(entity_id.clone()));
+    }
+
+    pub fn remember_asked(&mut self, target: &EntityId, action: &DiscussionLeadAction) {
+        self.insert(Meme::Asked(target.clone(), action.clone()));
     }
 
     pub fn insert(&mut self, meme: Meme) {
@@ -134,6 +147,11 @@ impl MemeTable {
             Meme::WaterSourceAt(hex) => Some(*hex),
             _ => None,
         })
+    }
+
+    pub fn asked_before(&self, target: &EntityId, action: &DiscussionLeadAction) -> bool {
+        self.memes
+            .contains(&Meme::Asked(target.clone(), action.clone()))
     }
 }
 

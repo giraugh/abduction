@@ -1,14 +1,19 @@
+use rand::Rng;
 use serde::{Deserialize, Serialize};
+use strum::VariantArray;
 
-use crate::entity::{
-    brain::{
-        actor_action::ActorAction,
-        characteristic::Characteristic,
-        discussion::DiscussionAction,
-        motivator::{self, MotivatorKey},
-        signal::Signal,
+use crate::{
+    entity::{
+        brain::{
+            actor_action::ActorAction,
+            characteristic::Characteristic,
+            discussion::{DiscussionAction, DiscussionLeadAction, InfoTopic, PersonalTopic},
+            motivator::{self, MotivatorKey},
+            signal::Signal,
+        },
+        EntityId,
     },
-    EntityId,
+    logs::AsEntityId,
 };
 
 /// Entities can focus on a certain task or objective. They can also pull other entities into a focus, affecting both of them.
@@ -39,6 +44,14 @@ pub enum ActorFocus {
         /// How interested in the conversation we are
         /// at 0, we stop the conversation (not rude per se)
         interest: usize,
+
+        /// When true, we are next to speak, emit speaking actions
+        /// When false, wait instead for speaking events from an interlocutor
+        ///
+        /// When we respond to an interlocutor, we set this to true
+        /// when we take a speak action, we unset this
+        /// (during resolution)
+        is_lead: bool,
     },
 
     /// Taking shelter in some shelter
@@ -56,9 +69,11 @@ impl Signal for ActorFocus {
     ) {
         match self {
             ActorFocus::Unfocused => {}
+
             ActorFocus::Sleeping { .. } => {
                 actions.add(10, ActorAction::Sleep);
             }
+
             ActorFocus::Sheltering { .. } => {
                 // Get less cold and wet
                 actions.add(5, ActorAction::ReduceMotivator(MotivatorKey::Cold));
@@ -82,20 +97,97 @@ impl Signal for ActorFocus {
                     actions.add(10, ActorAction::LeaveShelter);
                 }
             }
-            ActorFocus::Discussion { interest, .. } => {
-                let friendliness = ctx.entity.characteristic(Characteristic::Friendliness);
 
-                // For now just chat
-                actions.add(10, ActorAction::Discussion(DiscussionAction::LightChat));
+            ActorFocus::Discussion { is_lead, with, .. } => {
+                let my_memes = ctx.entity.attributes.memes.as_ref().unwrap();
 
-                // or chat about something heavier if more interested & friendly
-                if *interest > 5 && friendliness.is_high() {
-                    actions.add(20, ActorAction::Discussion(DiscussionAction::HeavyChat));
+                // If we are the lead, we take lead actions
+                // (but dont greet, we assume thats already happaned at this point)
+                if *is_lead {
+                    let interlocutor = ctx.entities.by_id(with).unwrap();
+                    let mut lead_actions = Vec::new();
+
+                    // We might always ask about entities that *we know about*
+                    let entities_to_ask_about: Vec<_> = ctx
+                        .entity
+                        .relations
+                        .associates()
+                        .map(|(id, _)| id)
+                        .collect();
+                    let opinion_weight =
+                        (10.0 / entities_to_ask_about.len() as f32).trunc() as usize;
+                    for entity_id in entities_to_ask_about {
+                        lead_actions.push((
+                            opinion_weight,
+                            DiscussionLeadAction::AskOpinionOnEntity(entity_id.to_owned()),
+                        ));
+                    }
+
+                    // We might ask about information we dont know about
+                    // We may also ask even if we do know that info, just with less priority
+                    // TODO: there is something to be said about re-asking some questions about information... ig we could
+                    //       just skip storing `asked` memes for those topics...
+                    let know_of_shelter = my_memes.shelter_locations().count() > 0;
+                    let know_of_water_source = my_memes.water_source_locations().count() > 0;
+                    let shelter_weight = if know_of_shelter { 5 } else { 20 };
+                    let water_weight = if know_of_water_source { 5 } else { 20 };
+                    lead_actions.push((
+                        shelter_weight,
+                        DiscussionLeadAction::AskForInfo(InfoTopic::ShelterLocation),
+                    ));
+                    lead_actions.push((
+                        water_weight,
+                        DiscussionLeadAction::AskForInfo(InfoTopic::WaterSourceLocation),
+                    ));
+
+                    // During the conversation, we attempt to keep track of the others connection w/ us
+                    // if we think we are close enough, we can ask personal questions
+                    // but this has variance (+-rng) so we might get it wrong
+                    // people also just have different tolerances for responding to personal questions
+                    // they just dont want to talk about themselves...
+                    const BOND_ERROR: f32 = 0.1; // 10% for now
+                    const BOND_REQ_FOR_PERSONAL_BASE: f32 = 0.4; // TODO: move this, also check its reasonable
+                    let mut estimated_bond = interlocutor.relations.bond(ctx.entity.id())
+                        + rand::rng().random_range(-BOND_ERROR..=BOND_ERROR);
+
+                    // If we are friendlier, assume they like us more
+                    // (and vice versa)
+                    let friendliness = ctx.entity.characteristic(Characteristic::Friendliness);
+                    if friendliness.is_high() {
+                        estimated_bond += BOND_ERROR;
+                    }
+                    if friendliness.is_low() {
+                        estimated_bond -= BOND_ERROR;
+                    }
+
+                    // If we think they like us enough, try to talk about more personal topics
+                    if estimated_bond > BOND_REQ_FOR_PERSONAL_BASE {
+                        for personal_topic in PersonalTopic::VARIANTS {
+                            lead_actions
+                                .push((20, DiscussionLeadAction::AskPersonal(*personal_topic)));
+                        }
+                    }
+
+                    // If there was absolutely nothing to talk about, ig we just lose interest
+                    // (we know them too well?? I dunno)
+                    if lead_actions.is_empty() {
+                        actions.add(5, DiscussionAction::LoseInterest.into());
+                    }
+
+                    // Consider any lead actions we haven't done before with this entity
+                    for (weight, lead_action) in lead_actions {
+                        if !my_memes.asked_before(interlocutor.id(), &lead_action) {
+                            actions.add(weight, DiscussionAction::Lead(lead_action).into());
+                        }
+                    }
                 }
 
-                // And if less friendly, also lose interest potentially
-                if !friendliness.is_high() {
-                    actions.add(5, ActorAction::Discussion(DiscussionAction::LoseInterest));
+                // If we aren't leading, typically we do nothing
+                // but in the future we may have stuff for us to do, like nodding along etc
+                // (「あいずち」みたい)
+                if !is_lead {
+                    // For now just do nothing
+                    // (which is automatic)
                 }
             }
         }

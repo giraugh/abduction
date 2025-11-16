@@ -181,6 +181,13 @@ impl EntityRelations {
             .unwrap_or_default()
     }
 
+    pub fn associates(&self) -> impl Iterator<Item = (&String, &EntityAssociate)> {
+        self.associates
+            .as_ref()
+            .into_iter()
+            .flat_map(|assocs| assocs.iter())
+    }
+
     /// Whether we dislike a given entity
     /// (i.e have a negative bond)
     pub fn dislike(&self, entity_id: &EntityId) -> bool {
