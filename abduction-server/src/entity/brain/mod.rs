@@ -744,6 +744,15 @@ impl Entity {
                     GameLogBody::EntityWarpIn,
                 ));
 
+                // Emit an "arrived in hex" event for that entity
+                GameEventBuilder::new()
+                    .of_kind(GameEventKind::ArriveInHex {
+                        entity_id: entity_id.clone(),
+                    })
+                    .targets(GameEventTarget::Hex(warp_hex))
+                    .with_physical_senses(0)
+                    .add(ctx);
+
                 return ActorActionResult::SideEffect(ActorActionSideEffect::UnbanishOther(
                     entity_id.clone(),
                     warp_hex,
