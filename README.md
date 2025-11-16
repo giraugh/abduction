@@ -28,6 +28,26 @@ Here's my ideation / notes on current game progress.
 
 -----
 
+#### Technical (Engine Improvements)
+
+Websocket Updates
+- Resuming websocket when dead
+- Backport this to qubit
+
+Migration Safety
+- When we make certain changes, I want to update some kind of version tag and then force a new game to be deployed when the CI build runs
+- this could quite literally use the rust version and put something in the db
+
+Entity ID Interning
+- Checkout `rodeo` crate for interning entity IDs
+- Reduce memory allocations
+- Alternatively, I could create my own mechanism for this by just using actual integers for ids
+  - Perhaps with a generation mechanism?
+  - TODO: check out what bevy does for this
+
+
+#### Game Design
+
 Narrative Framing
  - Introduction by a host
  - Slowly spawn in each player along with a narrative announcement
@@ -64,14 +84,6 @@ Fun Misc Feature Ideas
 - Players greeting each other
 - Memories
 - Fire spreading
-
-Websocket Updates
-- Resuming websocket when dead
-- Backport this to qubit
-
-Migration Safety
-- When we make certain changes, I want to update some kind of version tag and then force a new game to be deployed when the CI build runs
-- this could quite literally use the rust version and put something in the db
 
 Game linking design
   - Do we have one huge week-long game? or roughly one game a day?
