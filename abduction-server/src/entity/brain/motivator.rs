@@ -128,8 +128,6 @@ impl MotivatorTable {
     pub fn bump_key(&mut self, key: MotivatorKey) {
         if let Some(data) = self.0.get_mut(&key) {
             data.motivation = (data.motivation + data.sensitivity).clamp(0.0, 1.0);
-        } else {
-            warn!("Entity is missing motivator data for {:?}", key);
         }
     }
 
@@ -137,8 +135,6 @@ impl MotivatorTable {
     pub fn bump_scaled<K: Motivator>(&mut self, scale: f32) {
         if let Some(data) = self.0.get_mut(&K::TABLE_KEY) {
             data.motivation = (data.motivation + data.sensitivity * scale).clamp(0.0, 1.0);
-        } else {
-            warn!("Entity is missing motivator data for {:?}", K::TABLE_KEY);
         }
     }
 
@@ -146,8 +142,6 @@ impl MotivatorTable {
     pub fn clear<K: Motivator>(&mut self) {
         if let Some(data) = self.0.get_mut(&K::TABLE_KEY) {
             data.motivation = 0.0;
-        } else {
-            warn!("Entity is missing motivator data for {:?}", K::TABLE_KEY);
         }
     }
 
@@ -161,8 +155,6 @@ impl MotivatorTable {
     pub fn reduce_key(&mut self, key: MotivatorKey) {
         if let Some(data) = self.0.get_mut(&key) {
             data.motivation = (data.motivation - data.sensitivity).clamp(0.0, 1.0);
-        } else {
-            warn!("Entity is missing motivator data for {:?}", key);
         }
     }
 
@@ -170,8 +162,6 @@ impl MotivatorTable {
     pub fn reduce_by<K: Motivator>(&mut self, by: f32) {
         if let Some(data) = self.0.get_mut(&K::TABLE_KEY) {
             data.motivation = (data.motivation - by).clamp(0.0, 1.0);
-        } else {
-            warn!("Entity is missing motivator data for {:?}", K::TABLE_KEY);
         }
     }
 }
@@ -218,8 +208,6 @@ macro_rules! declare_motivators {
                     if let Some(behaviour_data) = self.0.get(&$keys::TABLE_KEY) {
                         let signal = $keys(behaviour_data.clone());
                         signals.push(SignalRef::boxed(signal));
-                    } else {
-                        warn!("Entity is missing motivator data for {:?}", $keys::TABLE_KEY);
                     }
                 })*
 
