@@ -9,6 +9,7 @@ use crate::{
     entity::{
         brain::{
             characteristic::{Characteristic, CharacteristicStrength},
+            discussion::{DiscussionLeadAction, DiscussionRespondAction},
             signal::SignalRef,
         },
         Entity, EntityId,
@@ -77,6 +78,23 @@ pub enum GameEventKind {
 
     /// Some entity dies
     Death { entity_id: EntityId },
+
+    /// Some entity "leads" a discussion
+    /// (typically involves asking a question)
+    /// NOTE: event targets the interlocutors
+    ///       if you are seeing the event you are being talked to
+    LeadDiscussion {
+        entity_id: EntityId,
+        action: DiscussionLeadAction,
+    },
+
+    /// Some entity "responds" in a discussion
+    /// NOTE: event targets the interlocutors
+    ///       if you are seeing the event you are being talked to
+    RespondDiscussion {
+        entity_id: EntityId,
+        action: DiscussionRespondAction,
+    },
 }
 
 #[allow(unused)]

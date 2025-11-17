@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import type { Entity, MotivatorKey } from '$lib/api.gen';
 	import { axialHexRange, axialToPixel, entityColor, HEX_SIZE, hexagonPoints } from '$lib/display';
 	import { game } from '$lib/game.svelte';
@@ -86,6 +87,12 @@
 		game.entities.forEach(updateEntityPosition);
 	});
 	$effect(() => game.onUpdate(updateEntityPosition));
+
+	$effect(() => {
+		if (browser) {
+			window.game = game;
+		}
+	});
 
 	const hexCounts = $derived.by(() => {
 		return game.entities

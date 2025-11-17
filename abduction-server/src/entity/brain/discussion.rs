@@ -77,14 +77,15 @@ use std::str::FromStr;
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use strum::VariantArray;
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::{
     entity::{
-        brain::{actor_action::ActorAction, focus::ActorFocus, ActorActionResult},
+        brain::{actor_action::ActorAction, focus::ActorFocus, meme::Meme, ActorActionResult},
         Entity, EntityId,
     },
-    logs::{GameLog, GameLogBody},
+    event::{builder::GameEventBuilder, GameEventKind, GameEventTarget},
+    logs::{AsEntityId, GameLog, GameLogBody},
     mtch::ActionCtx,
 };
 
@@ -167,7 +168,8 @@ pub enum DiscussionRespondAction {
     GivePersonal(PersonalTopic, String),
 
     /// Give some info (a meme) based on some question
-    GiveInfo(InfoTopic),
+    /// None -> "I dont know" response
+    GiveInfo(InfoTopic, Option<Meme>),
 
     /// Refuse to answer a question because its too personal / rude
     /// (What this looks like may vary between entities / instances)
@@ -186,7 +188,6 @@ pub enum DiscussionRespondAction {
     strum::Display,
     strum::VariantArray,
 )]
-#[serde(rename_all = "snake_case")]
 #[qubit::ts]
 pub enum PersonalTopic {
     Fear,
@@ -218,7 +219,6 @@ impl FromStr for PersonalTopic {
     strum::Display,
     strum::VariantArray,
 )]
-#[serde(rename_all = "snake_case")]
 #[qubit::ts]
 pub enum InfoTopic {
     WaterSourceLocation,
@@ -242,7 +242,7 @@ impl Entity {
     pub fn resolve_discussion_action(
         &mut self,
         action: &DiscussionAction,
-        ctx: &ActionCtx,
+        ctx: &mut ActionCtx,
     ) -> ActorActionResult {
         // Get a reference to the discussion focus
         let Some(ActorFocus::Discussion {
@@ -309,6 +309,33 @@ impl Entity {
             // We lose the `lead` status
             // the other interlocutor will respond and then become the new lead
             *is_lead = false;
+
+            // Emit an event
+            info!("EMIT EVENT");
+            GameEventBuilder::new()
+                .targets(GameEventTarget::Entity(interlocutor.id().clone()))
+                .of_kind(GameEventKind::LeadDiscussion {
+                    entity_id: self.entity_id.clone(),
+                    action: lead_action.clone(),
+                })
+                .add(ctx);
+        }
+
+        // Was this a respond action?
+        if let DiscussionAction::Respond(respond_action) = action {
+            info!("Responding with action {action:?}");
+
+            // We gain the lead status
+            *is_lead = true;
+
+            // Emit an event
+            GameEventBuilder::new()
+                .targets(GameEventTarget::Entity(interlocutor.id().clone()))
+                .of_kind(GameEventKind::RespondDiscussion {
+                    entity_id: self.entity_id.clone(),
+                    action: respond_action.clone(),
+                })
+                .add(ctx);
         }
 
         // Emit a log about the thing we said/did

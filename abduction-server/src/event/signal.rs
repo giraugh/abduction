@@ -1,9 +1,17 @@
+use rand::seq::IteratorRandom;
+use tracing::{info, warn};
+
 use super::GameEventKind;
 use crate::{
     entity::brain::{
         actor_action::ActorAction,
         characteristic::Characteristic,
-        focus::ActorFocus,
+        discussion::{
+            DiscussionAction, DiscussionLeadAction, DiscussionRespondAction, InfoTopic, Opinion,
+            PersonalTopic,
+        },
+        focus::{ActorFocus, BOND_REQ_FOR_PERSONAL_BASE},
+        meme::Meme,
         motivator::MotivatorKey,
         signal::{Signal, SignalContext, WeightedActorActions},
     },
@@ -106,6 +114,110 @@ impl Signal for GameEvent {
                         ]),
                     );
                 }
+            }
+
+            GameEventKind::LeadDiscussion {
+                entity_id: interlocutor_id,
+                action,
+            } => {
+                let mut rng = rand::rng();
+                let memes = ctx.entity.attributes.memes.as_ref().unwrap();
+
+                info!("Seeing lead discussion event {self:?}");
+
+                // TODO: chance we just aren't paying attention rn
+
+                // Respond to what they said, based on what they said
+                match action {
+                    DiscussionLeadAction::AskOpinionOnEntity(subject_id) => {
+                        // Resolve an opinion on that entity
+                        //  unknown -> Neutral
+                        //  like -> Positive
+                        //  dislike -> Negative
+                        let opinion = match ctx.entity.relations.bond(subject_id).total_cmp(&0.0) {
+                            std::cmp::Ordering::Less => Opinion::Negative,
+                            std::cmp::Ordering::Equal => Opinion::Neutral,
+                            std::cmp::Ordering::Greater => Opinion::Positive,
+                        };
+
+                        // Then respond w/ that
+                        actions.add(
+                            50,
+                            DiscussionAction::Respond(DiscussionRespondAction::GiveOpinion(
+                                opinion,
+                            ))
+                            .into(),
+                        );
+                    }
+
+                    DiscussionLeadAction::AskForInfo(info_topic) => {
+                        // Attempt to pull a random relevant meme
+                        // Will be None if we dont know any relevant info
+                        // NOTE: for locations, we could prob make this choose the closest or something
+                        let meme = match info_topic {
+                            InfoTopic::WaterSourceLocation => memes
+                                .water_source_locations()
+                                .choose(&mut rng)
+                                .map(Meme::WaterSourceAt),
+                            InfoTopic::ShelterLocation => memes
+                                .shelter_locations()
+                                .choose(&mut rng)
+                                .map(Meme::ShelterAt),
+                        };
+
+                        // Then respond w/ that
+                        actions.add(
+                            50,
+                            DiscussionAction::Respond(DiscussionRespondAction::GiveInfo(
+                                *info_topic,
+                                meme,
+                            ))
+                            .into(),
+                        );
+                    }
+
+                    DiscussionLeadAction::AskPersonal(personal_topic) => {
+                        // First off, is this appropriate? Do we balk at this kind of personal question?
+                        // this is also based off our personality
+                        // whats our threshold?
+                        let mut bond_requirement = BOND_REQ_FOR_PERSONAL_BASE;
+                        let openness = ctx.entity.characteristic(Characteristic::Openness);
+                        if openness.is_high() {
+                            bond_requirement -= 0.2;
+                        }
+                        if openness.is_low() {
+                            bond_requirement += 0.2;
+                        }
+
+                        let bond = ctx.entity.relations.bond(interlocutor_id);
+                        if bond < bond_requirement {
+                            actions.add(
+                                50,
+                                DiscussionAction::Respond(DiscussionRespondAction::Balk).into(),
+                            );
+                        } else {
+                            let bg = ctx.entity.attributes.background.as_ref().unwrap();
+                            let answer = match personal_topic {
+                                PersonalTopic::Fear => bg.fear.to_string(),
+                                PersonalTopic::Hope => bg.hope.to_string(),
+                            };
+
+                            actions.add(
+                                50,
+                                DiscussionAction::Respond(DiscussionRespondAction::GivePersonal(
+                                    *personal_topic,
+                                    answer,
+                                ))
+                                .into(),
+                            );
+                        }
+                    }
+                }
+            }
+
+            GameEventKind::RespondDiscussion { entity_id, action } => {
+                // TODO: if they told us info, remember it
+                warn!("foo NOT IMPL");
             }
         }
     }

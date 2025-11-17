@@ -63,6 +63,12 @@ impl FromStr for Meme {
             "dangerous" => Ok(Meme::EntityIsDangerous(rest.parse()?)),
             "shelter_at" => Ok(Meme::ShelterAt(rest.parse()?)),
             "water_source_at" => Ok(Meme::WaterSourceAt(rest.parse()?)),
+            "asked" => {
+                let (id, action) = rest
+                    .split_once(",")
+                    .ok_or(anyhow!("Malformed asked meme"))?;
+                Ok(Meme::Asked(id.parse()?, action.parse()?))
+            }
             _ => Err(anyhow!("Failed to parse meme, unkown tag {tag}")),
         }
     }
@@ -155,4 +161,16 @@ impl MemeTable {
     }
 }
 
-mod meme_string {}
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parse_asked_meme() {
+        let s = "asked:foobar,info:ShelterLocation";
+        let result = Meme::from_str(s);
+        dbg!(&result);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().to_string(), s);
+    }
+}

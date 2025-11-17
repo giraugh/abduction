@@ -39,6 +39,11 @@ pub enum Characteristic {
     /// Low -> Unfriendly, doesnt respond
     Friendliness,
 
+    /// High -> Willing to share personal information w/ anyone
+    /// Medium -> Willing to share personal information only w/ people they know well
+    /// Low -> Gets angry and responds poorly to personal questions regardless of how well they are known
+    Openness,
+
     /// High -> Strongly empathetic, takes on others pain
     /// Low -> Psychopathic uncaring type
     Empathy,

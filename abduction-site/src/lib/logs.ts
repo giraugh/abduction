@@ -262,4 +262,16 @@ export function logMessage(log: GameLog, game: Game) {
 	if (log.kind === 'entity_say_exact') {
 		return `${primaryName}: "${log.quote}"`;
 	}
+
+	if (log.kind === 'entity_ask') {
+		// TEMP
+		console.log(log);
+		return `${primaryName} asks ${secondaryName} about ???`;
+	}
+
+	if (log.kind === 'entity_respond') {
+		// TEMP
+		console.log(log);
+		return `${primaryName} responds to ${secondaryName} with ???`;
+	}
 }

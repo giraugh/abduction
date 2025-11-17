@@ -16,6 +16,9 @@ use crate::{
     logs::AsEntityId,
 };
 
+pub const BOND_ERROR: f32 = 0.1; // 10% for now
+pub const BOND_REQ_FOR_PERSONAL_BASE: f32 = 0.4; // TODO: move this, also check its reasonable
+
 /// Entities can focus on a certain task or objective. They can also pull other entities into a focus, affecting both of them.
 /// When a focus is active, the action-selection logic is unique.
 ///
@@ -99,7 +102,10 @@ impl Signal for ActorFocus {
             }
 
             ActorFocus::Discussion { is_lead, with, .. } => {
-                let my_memes = ctx.entity.attributes.memes.as_ref().unwrap();
+                let Some(my_memes) = ctx.entity.attributes.memes.as_ref() else {
+                    tracing::error!("Entity {} has no meme table", ctx.entity.id());
+                    return;
+                };
 
                 // If we are the lead, we take lead actions
                 // (but dont greet, we assume thats already happaned at this point)
@@ -145,8 +151,6 @@ impl Signal for ActorFocus {
                     // but this has variance (+-rng) so we might get it wrong
                     // people also just have different tolerances for responding to personal questions
                     // they just dont want to talk about themselves...
-                    const BOND_ERROR: f32 = 0.1; // 10% for now
-                    const BOND_REQ_FOR_PERSONAL_BASE: f32 = 0.4; // TODO: move this, also check its reasonable
                     let mut estimated_bond = interlocutor.relations.bond(ctx.entity.id())
                         + rand::rng().random_range(-BOND_ERROR..=BOND_ERROR);
 

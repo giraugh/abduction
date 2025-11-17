@@ -12,6 +12,7 @@ use strum::IntoEnumIterator;
 use crate::create_markers;
 use crate::entity::background::EntityBackground;
 use crate::entity::brain::characteristic::{Characteristic, CharacteristicStrength};
+use crate::entity::brain::meme::MemeTable;
 use crate::entity::brain::motivator::MotivatorTable;
 use crate::entity::{Entity, EntityAttributes};
 use crate::hex::AxialHex;
@@ -84,6 +85,10 @@ pub fn generate_player() -> anyhow::Result<Entity> {
     // Generate a background
     attributes.background = Some(EntityBackground::random_for_age(&mut rng, age));
 
+    // I want to feed this man some memes!
+    // (For players we just default initialise this so that its always readable)
+    attributes.memes = Some(MemeTable::default());
+
     // Generate random weak/strong attributes for a small number of characteristics
     // (most are average because most people are average at most things...)
     const UNIQUE_CHAR_COUNT: usize = 5;
@@ -130,7 +135,7 @@ pub fn random_city_country_pair() -> anyhow::Result<(String, String)> {
     let line = random_line_from_text_file(&CITIES_PATH)?;
     let (city, country) = line
         .split_once(":")
-        .ok_or(anyhow!("Malformed city/country line"))?;
+        .ok_or(anyhow!("Malformed city/country line '{line}'"))?;
     Ok((city.to_owned(), country.to_owned()))
 }
 
