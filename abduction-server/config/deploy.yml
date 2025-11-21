@@ -56,7 +56,6 @@ env:
 # Use a different ssh user than root
 ssh:
   user: alien
-  # TEMP:
   keys: ["~/.ssh/abduction-alien.pem"]
 
 # Use a persistent storage volume.
