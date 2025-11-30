@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rand::{seq::IndexedRandom, Rng};
+use rand::Rng;
 use tracing::warn;
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
             focus::ActorFocus,
             motivator,
         },
-        gen::generate_corpse,
+        generate::generate_corpse,
         snapshot::{EntitySnapshot, EntityView},
         world::{EntityWorld, TimeOfDay, WeatherKind},
         Entity, EntityAttributes, EntityHazard, EntityManager,
@@ -99,49 +99,37 @@ impl MatchManager {
             warn!("No collector is present");
         };
 
-        // Lets just attempt to implement the main entity loop and see how we go I guess?
-        // Rough plan is that each hex has one player action - the player who acted last acts now
-        // This is encoded as the player with the highest `TicksWaited` attribute
-        let players_in_hexes = entities_view
-            .all()
-            // cannot act if no hex
-            .filter(|e| has_markers!(e, Player) && e.attributes.hex.is_some())
-            .cloned()
-            .into_group_map_by(|e| e.attributes.hex.unwrap());
-        for (_hex, players) in players_in_hexes {
+        let players = entities_view.all().filter(|e| has_markers!(e, Player));
+        for entity in players {
             let mut rng = rand::rng();
 
-            // World acting on players in this hex
+            // World acting on this player
             {
-                if let Some(entity) = players.choose(&mut rng) {
-                    let mut player = entity.clone();
-                    self.resolve_world_effect_on_player(&mut player, &mut action_ctx);
-                    self.entities.upsert_entity(player).unwrap();
-                }
+                let mut player = entity.clone();
+                self.resolve_world_effect_on_player(&mut player, &mut action_ctx);
+                self.entities.upsert_entity(player).unwrap();
             }
 
             // Player actions in this hex
             {
-                if let Some(entity) = players.choose(&mut rng) {
-                    // Get a new copy to preserve changes from above
-                    // Skipping this step if they were removed
-                    let Some(player) = self.entities.get_entity(&entity.entity_id) else {
-                        continue;
-                    };
+                // Get a new copy to preserve changes from above
+                // Skipping this step if they were removed
+                let Some(player) = self.entities.get_entity(&entity.entity_id) else {
+                    continue;
+                };
 
-                    // What are they going to do?
-                    let events = action_ctx.events.get_event_signals_for_entity(&player);
-                    let action = player.get_next_action(&action_ctx, events);
+                // What are they going to do?
+                let events = action_ctx.events.get_event_signals_for_entity(&player);
+                let action = player.get_next_action(&action_ctx, events);
 
-                    // Go update it
-                    Self::resolve_actor_action(
-                        &mut action_ctx,
-                        &mut self.entities,
-                        &mut rng,
-                        player,
-                        action,
-                    );
-                }
+                // Go update it
+                Self::resolve_actor_action(
+                    &mut action_ctx,
+                    &mut self.entities,
+                    &mut rng,
+                    player,
+                    action,
+                );
             }
         }
 

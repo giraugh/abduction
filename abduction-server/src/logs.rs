@@ -3,7 +3,7 @@ use serde::Serialize;
 use crate::{
     entity::{
         brain::{
-            discussion::{self, DiscussionLeadAction, DiscussionRespondAction},
+            discussion::{DiscussionLeadAction, DiscussionRespondAction},
             motivator::MotivatorKey,
         },
         world::{TimeOfDay, WeatherKind},
@@ -116,11 +116,11 @@ pub enum GameLogBody {
 
     /// Primary entity asks the secondary entity something
     /// a "lead" discussion action
-    EntityAsk(DiscussionLeadAction),
+    EntityAsk { ask: DiscussionLeadAction },
 
     /// Primary entity respond to a question (or any lead action) from the secondary entity
     /// a "non-lead" discussion action
-    EntityRespond(DiscussionRespondAction),
+    EntityRespond { respond: DiscussionRespondAction },
 
     /// Primary entity is losing interest in the discussion
     EntityLoseInterest,

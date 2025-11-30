@@ -1,6 +1,6 @@
 pub mod background;
 pub mod brain;
-pub mod gen;
+pub mod generate;
 pub mod manager;
 pub mod snapshot;
 pub mod world;

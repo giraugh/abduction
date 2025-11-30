@@ -26,8 +26,8 @@ use tracing::info;
 
 use crate::{
     entity::{
-        gen::generate_player, snapshot::EntityView, world::EntityWorld, Entity, EntityAttributes,
-        EntityManager, EntityManagerMutation,
+        generate::generate_player, snapshot::EntityView, world::EntityWorld, Entity,
+        EntityAttributes, EntityManager, EntityManagerMutation,
     },
     event::{EventStore, EventsView, GameEvent},
     has_markers,

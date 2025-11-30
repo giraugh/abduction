@@ -1,4 +1,4 @@
-import type { AxialHexDirection, GameLog, MotivatorKey, Topic } from './api.gen';
+import type { AxialHexDirection, GameLog, InfoTopic, MotivatorKey } from './api.gen';
 import type { Game } from './game.svelte';
 
 /** If global, shows up everywhere, if local only if scoped to the hex/entity */
@@ -53,8 +53,7 @@ function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverit
 				tiredness: `${name} yawns`,
 				saturation: `${name} has water dripping off of them`,
 				cold: `${name} is shivering`,
-				sadness: `${name} is looking glum`,
-				friendliness: 'NA'
+				sadness: `${name} is looking glum`
 			} satisfies Record<MotivatorKey, string>
 		)[motivator];
 	}
@@ -70,27 +69,18 @@ function formatBark(name: string, motivator: MotivatorKey, severity: BarkSeverit
 				tiredness: `${name} is falling asleep`,
 				saturation: `${name} looks absolutely drenched`,
 				cold: `${name} looks extremely cold`,
-				sadness: `${name} is quietly crying`,
-				friendliness: 'NA'
+				sadness: `${name} is quietly crying`
 			} satisfies Record<MotivatorKey, string>
 		)[motivator];
 	}
 }
 
-function formatChatTopic(topic: Topic): string {
-	return (
-		{
-			alien_situation: 'the aliens',
-			ambitions: 'their life ambitions',
-			career: 'their past career',
-			entertainment: 'a tv show they saw recently',
-			family: 'their family back home',
-			fears: 'their innermost fears',
-			hopes: 'their hopes and dreams',
-			news: 'the current going-ons',
-			weather: 'this weather'
-		} satisfies Record<Topic, string>
-	)[topic];
+function formatInfoTopic(topic: InfoTopic) {
+	if (topic === 'ShelterLocation') {
+		return 'a safe location to take shelter';
+	} else if (topic === 'WaterSourceLocation') {
+		return 'somewhere to find running water';
+	}
 }
 
 export function logMessage(log: GameLog, game: Game) {
@@ -211,10 +201,6 @@ export function logMessage(log: GameLog, game: Game) {
 		return `${primaryName} is upset by witnessing death`;
 	}
 
-	if (log.kind === 'entity_chat') {
-		return `${primaryName} chats with ${secondaryName} about ${formatChatTopic(log.topic)}`;
-	}
-
 	if (log.kind === 'entity_lose_interest') {
 		return `${primaryName} gets distracted from the conversation`;
 	}
@@ -264,14 +250,38 @@ export function logMessage(log: GameLog, game: Game) {
 	}
 
 	if (log.kind === 'entity_ask') {
-		// TEMP
-		console.log(log);
-		return `${primaryName} asks ${secondaryName} about ???`;
+		if (log.ask.kind === 'ask_for_info') {
+			return `${primaryName} asks ${secondaryName} whether they know of ${formatInfoTopic(log.ask.topic)}`;
+		} else if (log.ask.kind === 'ask_opinion_on_entity') {
+			const entityName = game.entities.get(log.ask.entity_id)?.name ?? 'someone they met';
+			return `${primaryName} asks ${secondaryName} what they think about ${entityName}`;
+		} else if (log.ask.kind === 'ask_personal') {
+			if (log.ask.topic === 'Fear') {
+				return `${primaryName} asks ${secondaryName} what their innermost fear is`;
+			} else if (log.ask.topic === 'Hope') {
+				return `${primaryName} asks ${secondaryName} what they hope for the future`;
+			}
+		}
 	}
 
 	if (log.kind === 'entity_respond') {
-		// TEMP
-		console.log(log);
-		return `${primaryName} responds to ${secondaryName} with ???`;
+		if (log.respond.kind === 'balk') {
+			return `${primaryName} stops talking awkwardly`;
+		} else if (log.respond.kind === 'give_info') {
+			if (log.respond.meme === null) {
+				return `${primaryName} shakes their head`;
+			} else {
+				//TODO: improve
+				return `${primaryName} describes what they know`;
+			}
+		} else if (log.respond.kind === 'give_opinion') {
+			if (log.respond.opinion === 'Neutral') {
+				return `${primaryName} shrugs and says they are ambivalent`;
+			} else if (log.respond.opinion === 'Positive') {
+				return `${primaryName} responds positively and gives a thumbs up`;
+			} else if (log.respond.opinion === 'Negative') {
+				return `${primaryName} frowns and shakes their head`;
+			}
+		}
 	}
 }

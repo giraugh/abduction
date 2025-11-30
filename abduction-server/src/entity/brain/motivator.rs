@@ -3,7 +3,6 @@
 use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::warn;
 
 use super::{
     actor_action::ActorAction,
@@ -366,14 +365,15 @@ impl Signal for Boredom {
     fn act_on(&self, ctx: &SignalContext, actions: &mut WeightedActorActions) {
         match ctx.focus {
             ActorFocus::Unfocused => {
-                if self.motivation() > 0.5 {
-                    actions.add(
-                        2,
-                        ActorAction::Bark(self.motivation(), MotivatorKey::Boredom),
-                    );
-                }
+                // if self.motivation() > 0.5 {
+                //     actions.add(
+                //         2,
+                //         ActorAction::Bark(self.motivation(), MotivatorKey::Boredom),
+                //     );
+                // }
 
                 // If bored enough, do a random movement
+                // TODO: or maybe talk to someone/thing?
                 if self.motivation() > 0.7 {
                     actions.extend(
                         ActorAction::all_movements()

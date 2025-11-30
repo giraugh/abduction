@@ -232,7 +232,11 @@
 		</ul>
 		<ul class="logs">
 			{#each logView as log (log.id)}
-				<li class:quote={log.kind === 'entity_say_exact'} class:global={log.level === 'global'}>
+				<li
+					class:quote={log.kind === 'entity_say_exact'}
+					class:global={log.level === 'global'}
+					class:bark={log.kind === 'entity_motivator_bark'}
+				>
 					{log.message}
 				</li>
 			{/each}
@@ -471,6 +475,10 @@
 				padding-inline: 0.3em;
 				background: #555;
 				margin-block: 0.2em;
+			}
+
+			&.bark {
+				opacity: 0.5;
 			}
 
 			&.quote {

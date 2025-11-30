@@ -68,17 +68,14 @@ impl Signal for GameEvent {
                 }
 
                 // If we are friendly, we might choose to great the entity arriving in the hex
-                // NOTE: we need to be able to get entities at this point...
-                let we_are_friendly = ctx
-                    .entity
-                    .characteristic(Characteristic::Friendliness)
-                    .is_high();
+                let friendliness = ctx.entity.characteristic(Characteristic::Friendliness);
                 let dislike = ctx.entity.relations.dislike(entity_id);
 
                 // If we're a friendly person and we dont dislike this person who showed up, consider greeting them
-                if we_are_friendly && !dislike {
+                // NOTE: if we aren't friendly we may still great them, just less likely
+                if !friendliness.is_low() && !dislike {
                     actions.add(
-                        20, // too low?
+                        if friendliness.is_high() { 30 } else { 5 },
                         ActorAction::GreetEntity {
                             entity_id: entity_id.clone(),
                         },
@@ -129,7 +126,9 @@ impl Signal for GameEvent {
 
                 // Respond to what they said, based on what they said
                 match action {
-                    DiscussionLeadAction::AskOpinionOnEntity(subject_id) => {
+                    DiscussionLeadAction::AskOpinionOnEntity {
+                        entity_id: subject_id,
+                    } => {
                         // Resolve an opinion on that entity
                         //  unknown -> Neutral
                         //  like -> Positive
@@ -143,14 +142,14 @@ impl Signal for GameEvent {
                         // Then respond w/ that
                         actions.add(
                             50,
-                            DiscussionAction::Respond(DiscussionRespondAction::GiveOpinion(
+                            DiscussionAction::Respond(DiscussionRespondAction::GiveOpinion {
                                 opinion,
-                            ))
+                            })
                             .into(),
                         );
                     }
 
-                    DiscussionLeadAction::AskForInfo(info_topic) => {
+                    DiscussionLeadAction::AskForInfo { topic: info_topic } => {
                         // Attempt to pull a random relevant meme
                         // Will be None if we dont know any relevant info
                         // NOTE: for locations, we could prob make this choose the closest or something
@@ -168,15 +167,17 @@ impl Signal for GameEvent {
                         // Then respond w/ that
                         actions.add(
                             50,
-                            DiscussionAction::Respond(DiscussionRespondAction::GiveInfo(
-                                *info_topic,
+                            DiscussionAction::Respond(DiscussionRespondAction::GiveInfo {
+                                topic: *info_topic,
                                 meme,
-                            ))
+                            })
                             .into(),
                         );
                     }
 
-                    DiscussionLeadAction::AskPersonal(personal_topic) => {
+                    DiscussionLeadAction::AskPersonal {
+                        topic: personal_topic,
+                    } => {
                         // First off, is this appropriate? Do we balk at this kind of personal question?
                         // this is also based off our personality
                         // whats our threshold?
@@ -204,10 +205,10 @@ impl Signal for GameEvent {
 
                             actions.add(
                                 50,
-                                DiscussionAction::Respond(DiscussionRespondAction::GivePersonal(
-                                    *personal_topic,
+                                DiscussionAction::Respond(DiscussionRespondAction::GivePersonal {
+                                    topic: *personal_topic,
                                     answer,
-                                ))
+                                })
                                 .into(),
                             );
                         }

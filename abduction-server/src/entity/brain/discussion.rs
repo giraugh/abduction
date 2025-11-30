@@ -107,24 +107,25 @@ pub enum DiscussionAction {
     Respond(DiscussionRespondAction),
 }
 
-impl Into<ActorAction> for DiscussionAction {
-    fn into(self) -> ActorAction {
-        ActorAction::Discussion(self)
+impl From<DiscussionAction> for ActorAction {
+    fn from(val: DiscussionAction) -> Self {
+        ActorAction::Discussion(val)
     }
 }
 
 /// Lead actions
 /// only takeable when the `is_lead` is set
+#[allow(clippy::enum_variant_names)]
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Hash, strum::Display)]
+#[serde(rename_all = "snake_case", tag = "kind")]
 #[qubit::ts]
-#[serde(rename_all = "snake_case")]
 pub enum DiscussionLeadAction {
-    #[strum(to_string = "opinion:{0}")]
-    AskOpinionOnEntity(EntityId),
-    #[strum(to_string = "personal:{0}")]
-    AskPersonal(PersonalTopic),
-    #[strum(to_string = "info:{0}")]
-    AskForInfo(InfoTopic),
+    #[strum(to_string = "opinion:{entity_id}")]
+    AskOpinionOnEntity { entity_id: EntityId },
+    #[strum(to_string = "personal:{topic}")]
+    AskPersonal { topic: PersonalTopic },
+    #[strum(to_string = "info:{topic}")]
+    AskForInfo { topic: InfoTopic },
 }
 
 impl FromStr for DiscussionLeadAction {
@@ -135,9 +136,15 @@ impl FromStr for DiscussionLeadAction {
             .split_once(":")
             .ok_or(anyhow!("Malformed discussion lead action. No tag"))?;
         match tag {
-            "opinion" => Ok(DiscussionLeadAction::AskOpinionOnEntity(rest.parse()?)),
-            "personal" => Ok(DiscussionLeadAction::AskPersonal(rest.parse()?)),
-            "info" => Ok(DiscussionLeadAction::AskForInfo(rest.parse()?)),
+            "opinion" => Ok(DiscussionLeadAction::AskOpinionOnEntity {
+                entity_id: rest.parse()?,
+            }),
+            "personal" => Ok(DiscussionLeadAction::AskPersonal {
+                topic: rest.parse()?,
+            }),
+            "info" => Ok(DiscussionLeadAction::AskForInfo {
+                topic: rest.parse()?,
+            }),
             _ => Err(anyhow!(
                 "Failed to parse discussion lead action, unkown tag {tag}"
             )),
@@ -158,18 +165,25 @@ pub enum Opinion {
 /// Responses to lead actions
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[qubit::ts]
+#[serde(rename_all = "snake_case", tag = "kind")]
 pub enum DiscussionRespondAction {
     /// Given an opinion on some entity
     /// derived from relations
-    GiveOpinion(Opinion),
+    GiveOpinion { opinion: Opinion },
 
     /// Give an answer to some personal question
     /// (NOTE: this includes the resolved display of the answer)
-    GivePersonal(PersonalTopic, String),
+    GivePersonal {
+        topic: PersonalTopic,
+        answer: String,
+    },
 
     /// Give some info (a meme) based on some question
     /// None -> "I dont know" response
-    GiveInfo(InfoTopic, Option<Meme>),
+    GiveInfo {
+        topic: InfoTopic,
+        meme: Option<Meme>,
+    },
 
     /// Refuse to answer a question because its too personal / rude
     /// (What this looks like may vary between entities / instances)
@@ -344,14 +358,18 @@ impl Entity {
                 ctx.send_log(GameLog::entity_pair(
                     self,
                     interlocutor,
-                    GameLogBody::EntityAsk(discussion_lead_action.clone()),
+                    GameLogBody::EntityAsk {
+                        ask: discussion_lead_action.clone(),
+                    },
                 ));
             }
             DiscussionAction::Respond(discussion_respond_action) => {
                 ctx.send_log(GameLog::entity_pair(
                     self,
                     interlocutor,
-                    GameLogBody::EntityRespond(discussion_respond_action.clone()),
+                    GameLogBody::EntityRespond {
+                        respond: discussion_respond_action.clone(),
+                    },
                 ));
             }
             DiscussionAction::LoseInterest => {

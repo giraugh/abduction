@@ -6,7 +6,7 @@ use strum::VariantArray;
 
 use crate::entity::{
     background::{career::Career, fear::Fear, hope::Hope, EntityBackground},
-    gen::random_city_country_pair,
+    generate::random_city_country_pair,
 };
 
 impl EntityBackground {

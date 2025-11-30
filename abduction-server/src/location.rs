@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     create_markers,
-    entity::{gen::PropGenerator, Entity, EntityAttributes, EntityLocation, EntityMarker},
+    entity::{generate::PropGenerator, Entity, EntityAttributes, EntityLocation, EntityMarker},
     hex::AxialHex,
 };
 

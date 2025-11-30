@@ -125,7 +125,9 @@ impl Signal for ActorFocus {
                     for entity_id in entities_to_ask_about {
                         lead_actions.push((
                             opinion_weight,
-                            DiscussionLeadAction::AskOpinionOnEntity(entity_id.to_owned()),
+                            DiscussionLeadAction::AskOpinionOnEntity {
+                                entity_id: entity_id.to_owned(),
+                            },
                         ));
                     }
 
@@ -139,11 +141,15 @@ impl Signal for ActorFocus {
                     let water_weight = if know_of_water_source { 5 } else { 20 };
                     lead_actions.push((
                         shelter_weight,
-                        DiscussionLeadAction::AskForInfo(InfoTopic::ShelterLocation),
+                        DiscussionLeadAction::AskForInfo {
+                            topic: InfoTopic::ShelterLocation,
+                        },
                     ));
                     lead_actions.push((
                         water_weight,
-                        DiscussionLeadAction::AskForInfo(InfoTopic::WaterSourceLocation),
+                        DiscussionLeadAction::AskForInfo {
+                            topic: InfoTopic::WaterSourceLocation,
+                        },
                     ));
 
                     // During the conversation, we attempt to keep track of the others connection w/ us
@@ -167,8 +173,12 @@ impl Signal for ActorFocus {
                     // If we think they like us enough, try to talk about more personal topics
                     if estimated_bond > BOND_REQ_FOR_PERSONAL_BASE {
                         for personal_topic in PersonalTopic::VARIANTS {
-                            lead_actions
-                                .push((20, DiscussionLeadAction::AskPersonal(*personal_topic)));
+                            lead_actions.push((
+                                20,
+                                DiscussionLeadAction::AskPersonal {
+                                    topic: *personal_topic,
+                                },
+                            ));
                         }
                     }
 
