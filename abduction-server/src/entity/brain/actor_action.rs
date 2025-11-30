@@ -1,4 +1,5 @@
 use crate::entity::brain::focus::ActorFocus;
+use crate::entity::brain::meme::Meme;
 use crate::entity::{EntityId, EntityMarker};
 use crate::hex::{AxialHex, AxialHexDirection};
 use crate::logs::GameLogBody;
@@ -20,6 +21,9 @@ pub enum ActorAction {
 
     /// Try each action in the list until one works
     Sequential(Vec<ActorAction>),
+
+    /// Remember a given meme
+    StoreMeme(Meme),
 
     /// Add some specific entity to the inventory, if there is room
     PickUpEntity(EntityId),

@@ -77,6 +77,8 @@ impl WeightedActorActions {
         actions[dist.sample(rng)].clone()
     }
 
+    /// NOTE: I occasionally just use this for debugging
+    #[allow(unused)]
     pub fn len(&self) -> usize {
         self.actions.as_ref().map(|x| x.len()).unwrap_or_default()
     }

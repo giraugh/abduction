@@ -125,6 +125,10 @@ impl Entity {
                 return ActorActionResult::NoEffect;
             }
 
+            ActorAction::StoreMeme(meme) => {
+                self.memes_mut().insert(meme.clone());
+            }
+
             ActorAction::PickUpEntity(entity_id) => {
                 // Find that item, it must be an `item` (have an item field)
                 let Some(item_entity) = ctx.entities.by_id(entity_id) else {

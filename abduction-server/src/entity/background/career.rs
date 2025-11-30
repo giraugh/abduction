@@ -1,3 +1,5 @@
+use std::fmt;
+
 use serde::{de::Visitor, Deserialize, Serialize};
 use strum::VariantArray;
 
@@ -340,10 +342,10 @@ fn lower_with_spaces(s: String) -> String {
         .collect::<String>()
 }
 
-impl ToString for Career {
-    fn to_string(&self) -> String {
+impl fmt::Display for Career {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let discriminator: &'static str = self.into();
-        lower_with_spaces(discriminator.to_string())
+        write!(f, "{}", lower_with_spaces(discriminator.to_string()))
     }
 }
 

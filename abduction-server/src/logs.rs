@@ -217,6 +217,9 @@ pub enum GameLogBody {
     /// used by crew
     EntitySayExact { quote: String },
 
+    /// Primary entity thanks the secondary entity
+    EntityThank,
+
     /// Entity A (a hazard) hurts entity B
     HazardHurt,
 }

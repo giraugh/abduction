@@ -217,8 +217,34 @@ impl Signal for GameEvent {
             }
 
             GameEventKind::RespondDiscussion { entity_id, action } => {
-                // TODO: if they told us info, remember it
-                warn!("foo NOT IMPL");
+                match action {
+                    DiscussionRespondAction::GiveInfo { meme, .. } => {
+                        // Store the meme if we recieved one
+                        if let Some(meme) = meme {
+                            // Okay so we cant actually *DO* anything in this context but we can add possible actions,
+                            // so lets add an action that responds with a "thankyou" log and also adds this meme
+                            // (Add a very high weight so that we basically always do that thing)
+                            // TODO: maybe some people wouldn't be friendly?
+                            actions.add(
+                                10000,
+                                ActorAction::Sequential(vec![
+                                    ActorAction::Log {
+                                        other: Some(entity_id.clone()),
+                                        body: GameLogBody::EntityThank,
+                                    },
+                                    ActorAction::StoreMeme(meme.clone()),
+                                ]),
+                            );
+                        }
+                    }
+
+                    // TODO: FUTURE: update our opinion
+                    DiscussionRespondAction::GiveOpinion { opinion } => todo!(),
+
+                    // Not much for us to do in these cases tbh
+                    DiscussionRespondAction::Balk
+                    | DiscussionRespondAction::GivePersonal { .. } => {}
+                }
             }
         }
     }

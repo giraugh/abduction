@@ -119,6 +119,8 @@ impl Signal for ActorFocus {
                         .relations
                         .associates()
                         .map(|(id, _)| id)
+                        // And dont ask them about themselves lol
+                        .filter(|id| interlocutor.id() != *id)
                         .collect();
                     let opinion_weight =
                         (10.0 / entities_to_ask_about.len() as f32).trunc() as usize;
