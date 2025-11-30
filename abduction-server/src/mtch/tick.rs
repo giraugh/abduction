@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use rand::Rng;
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::{
     create_markers,
@@ -100,23 +100,35 @@ impl MatchManager {
         };
 
         let players = entities_view.all().filter(|e| has_markers!(e, Player));
-        for entity in players {
+        for player in players {
             let mut rng = rand::rng();
 
             // World acting on this player
             {
-                let mut player = entity.clone();
+                // let mut player = player.clone();
+                let Some(mut player) = self.entities.get_entity(&player.entity_id) else {
+                    warn!("NO GOOD!");
+                    continue;
+                };
+
                 self.resolve_world_effect_on_player(&mut player, &mut action_ctx);
                 self.entities.upsert_entity(player).unwrap();
             }
 
             // Player actions in this hex
             {
-                // Get a new copy to preserve changes from above
+                // Get a new copy to preserve changes from previous loop
                 // Skipping this step if they were removed
-                let Some(player) = self.entities.get_entity(&entity.entity_id) else {
+                let Some(player) = self.entities.get_entity(&player.entity_id) else {
+                    warn!("NO GOOD!");
                     continue;
                 };
+
+                // If the player has no hex yet, they actually cannot do anything
+                // i.e they are banished
+                if player.attributes.hex.is_none() {
+                    continue;
+                }
 
                 // What are they going to do?
                 let events = action_ctx.events.get_event_signals_for_entity(&player);

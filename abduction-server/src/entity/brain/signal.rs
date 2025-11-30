@@ -76,6 +76,10 @@ impl WeightedActorActions {
         // Sample the distribution
         actions[dist.sample(rng)].clone()
     }
+
+    pub fn len(&self) -> usize {
+        self.actions.as_ref().map(|x| x.len()).unwrap_or_default()
+    }
 }
 
 impl WeightedActorActions {

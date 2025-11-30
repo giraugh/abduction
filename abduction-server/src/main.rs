@@ -323,7 +323,7 @@ async fn run_match_now(ctx: ServerCtx) -> anyhow::Result<()> {
 
             // Okay cool, create a new match
             info!("Creating a new match");
-            let dev_match = MatchConfig::isolated(50, 5);
+            let dev_match = MatchConfig::isolated(10, 5);
             dev_match
                 .save(&ctx.db)
                 .await
